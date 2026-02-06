@@ -1,0 +1,15 @@
+# Production Dependencies
+fastapi
+uvicorn[standard]
+websockets
+pandas
+aiohttp
+pyzmq
+matplotlib
+streamlit
+python-dotenv
+pydantic
+requests
+scipy
+numpy
+plotly
