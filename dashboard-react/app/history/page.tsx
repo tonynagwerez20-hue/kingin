@@ -17,6 +17,34 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export default function HistoryPage() {
+    const [trades, setTrades] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchTrades = async () => {
+            try {
+                const res = await fetch("http://localhost:8000/trades?status=closed&limit=100");
+                const data = await res.json();
+                setTrades(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error("Failed to fetch trades:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTrades();
+    }, []);
+
+    const netProfit = trades.reduce((acc, t) => acc + (t.pnl || 0), 0);
+    const winRate = trades.length > 0
+        ? (trades.filter(t => t.pnl > 0).length / trades.length) * 100
+        : 0;
+
+    const grossProfit = trades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
+    const grossLoss = Math.abs(trades.filter(t => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99.9 : 0);
+
     return (
         <div className="max-w-7xl mx-auto space-y-6">
             <header className="flex items-center justify-between border-b border-border pb-6">
@@ -33,16 +61,25 @@ export default function HistoryPage() {
                     <button className="flex items-center gap-2 px-3 py-1.5 bg-accent/30 border border-border/50 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-accent transition-all">
                         <Download size={14} /> Export CSV
                     </button>
-                    <button className="p-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-all">
-                        <Search size={18} />
-                    </button>
                 </div>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <PerformanceCard label="Net Profit" value="$12,450.22" trend="+12%" />
-                <PerformanceCard label="Win Rate" value="64.8%" trend="+2.1%" />
-                <PerformanceCard label="Profit Factor" value="1.82" trend="+0.15" />
+                <PerformanceCard
+                    label="Net Profit"
+                    value={`$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    trend={netProfit >= 0 ? "SURPLUS" : "DEFICIT"}
+                />
+                <PerformanceCard
+                    label="Win Rate"
+                    value={`${winRate.toFixed(1)}%`}
+                    trend={`${trades.length} TRADES`}
+                />
+                <PerformanceCard
+                    label="Profit Factor"
+                    value={profitFactor.toFixed(2)}
+                    trend="STRATEGY_HEALTH"
+                />
             </div>
 
             <Card>
@@ -53,7 +90,9 @@ export default function HistoryPage() {
                             <CardDescription className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">Chronological Order History</CardDescription>
                         </div>
                         <div className="flex gap-2">
-                            <Badge variant="outline" className="border-white/10 text-muted-foreground font-mono">TOTAL: 1,422</Badge>
+                            <Badge variant="outline" className="border-white/10 text-muted-foreground font-mono">
+                                TOTAL: {trades.length}
+                            </Badge>
                         </div>
                     </div>
                 </CardHeader>
@@ -67,37 +106,22 @@ export default function HistoryPage() {
                             <span>Size</span>
                             <span className="text-right">Profit/Loss</span>
                         </div>
-                        <div className="space-y-1">
-                            <JournalItem
-                                time="2026-02-07 20:12:44"
-                                symbol="XAU/USD"
-                                type="BUY"
-                                entry="2645.10"
-                                exit="2650.40"
-                                size="0.50"
-                                pnl="+265.00"
-                                win={true}
-                            />
-                            <JournalItem
-                                time="2026-02-07 19:44:12"
-                                symbol="XAU/USD"
-                                type="SELL"
-                                entry="2652.80"
-                                exit="2654.10"
-                                size="0.25"
-                                pnl="-32.50"
-                                win={false}
-                            />
-                            <JournalItem
-                                time="2026-02-07 18:05:01"
-                                symbol="XAU/USD"
-                                type="BUY"
-                                entry="2642.00"
-                                exit="2648.50"
-                                size="0.10"
-                                pnl="+65.00"
-                                win={true}
-                            />
+                        <div className="space-y-1 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                            {trades.length > 0 ? trades.map((trade, i) => (
+                                <JournalItem
+                                    key={i}
+                                    time={trade.exit_time || trade.entry_time}
+                                    symbol={trade.symbol}
+                                    type={trade.type || trade.action}
+                                    entry={trade.entry_price?.toFixed(2) || "0.00"}
+                                    exit={trade.exit_price?.toFixed(2) || "0.00"}
+                                    size={trade.lots || "0.01"}
+                                    pnl={(trade.pnl >= 0 ? "+" : "") + trade.pnl?.toFixed(2)}
+                                    win={trade.pnl > 0}
+                                />
+                            )) : (
+                                <div className="text-center py-20 opacity-30 italic text-[10px] uppercase">No Historical Records Found</div>
+                            )}
                         </div>
                     </div>
                 </CardContent>
@@ -113,7 +137,10 @@ function PerformanceCard({ label, value, trend }: { label: string; value: string
                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{label}</span>
                 <div className="flex items-end justify-between mt-2">
                     <div className="text-3xl font-black tracking-tighter">{value}</div>
-                    <div className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded">
+                    <div className={cn(
+                        "text-[10px] font-black px-2 py-1 rounded capitalize tracking-widest",
+                        trend === "SURPLUS" || trend.includes("TRADES") || trend === "STRATEGY_HEALTH" ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10"
+                    )}>
                         {trend}
                     </div>
                 </div>
@@ -125,9 +152,9 @@ function PerformanceCard({ label, value, trend }: { label: string; value: string
 function JournalItem({ time, symbol, type, entry, exit, size, pnl, win }: any) {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 px-4 py-3 border border-border/30 rounded hover:bg-accent/10 transition-colors items-center text-[10px] font-mono">
-            <span className="text-muted-foreground hidden lg:inline">{time}</span>
+            <span className="text-muted-foreground hidden lg:inline truncate">{time}</span>
             <span className="font-black tracking-tight uppercase text-foreground lg:font-mono">{symbol}</span>
-            <span className={cn("font-black uppercase", type === "BUY" ? "text-primary" : "text-destructive")}>{type}</span>
+            <span className={cn("font-black uppercase", type === "BUY" || type === "LONG" ? "text-primary" : "text-destructive")}>{type}</span>
             <div className="flex items-center gap-1 text-muted-foreground">
                 <span className="font-bold text-foreground">{entry}</span>
                 <ArrowRight size={10} className="mx-1" />

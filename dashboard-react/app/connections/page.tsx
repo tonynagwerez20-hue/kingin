@@ -18,6 +18,27 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export default function ConnectionsPage() {
+    const [status, setStatus] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const res = await fetch("http://localhost:8000/status/detailed");
+                const data = await res.json();
+                setStatus(data);
+            } catch (error) {
+                console.error("Failed to fetch connection status:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStatus();
+        const interval = setInterval(fetchStatus, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <div className="max-w-7xl mx-auto space-y-6">
             <header className="flex items-center justify-between border-b border-border pb-6">
@@ -30,7 +51,10 @@ export default function ConnectionsPage() {
                         Low-Level Socket & Service Monitoring
                     </p>
                 </div>
-                <button className="flex items-center gap-2 px-3 py-1.5 bg-accent/30 border border-border/50 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-accent transition-all">
+                <button
+                    onClick={() => window.location.reload()}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-accent/30 border border-border/50 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-accent transition-all"
+                >
                     <RefreshCcw size={14} /> Full System Sync
                 </button>
             </header>
@@ -39,22 +63,22 @@ export default function ConnectionsPage() {
                 <SocketCard
                     label="DTC Service"
                     desc="Sierra Chart Direct Interface"
-                    port="tcp://127.0.0.1:11099"
-                    status="connected"
-                    latency="4ms"
+                    port={status?.dtc?.address || "tcp://127.0.0.1:11099"}
+                    status={status?.dtc?.synced ? "connected" : "disconnected"}
+                    latency={status?.dtc?.latency || "N/A"}
                 />
                 <SocketCard
-                    label="ZeroMQ Pipeline"
-                    desc="Internal Message Bus"
-                    port="ipc://trading_bus"
+                    label="Internal Pipeline"
+                    desc="FastAPI Data Bridge"
+                    port="http://localhost:8000"
                     status="connected"
                     latency="1ms"
                 />
                 <SocketCard
                     label="Strategy Engine"
                     desc="Python Core Execution"
-                    port="pid: 4421"
-                    status="connected"
+                    port={`pid: ${status?.engine?.pid || "N/A"}`}
+                    status={status?.engine?.status === "ACTIVE" ? "connected" : "disconnected"}
                     latency="N/A"
                 />
             </div>
@@ -66,7 +90,9 @@ export default function ConnectionsPage() {
                             <CardTitle className="text-lg font-black tracking-tight uppercase">Traffic Topology</CardTitle>
                             <CardDescription className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mt-1">Real-time packet flow & throughput</CardDescription>
                         </div>
-                        <Badge variant="outline" className="border-white/10 text-muted-foreground font-mono">BANDWIDTH: 1.2 MB/s</Badge>
+                        <Badge variant="outline" className="border-white/10 text-muted-foreground font-mono">
+                            BANDWIDTH: {status?.throughput || "0.0"} KB/s
+                        </Badge>
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -74,8 +100,15 @@ export default function ConnectionsPage() {
                         <div className="absolute inset-0 bg-[url('/grid.svg')] bg-[size:24px_24px] opacity-10" />
                         <div className="flex flex-col items-center opacity-30 group-hover:opacity-50 transition-opacity">
                             <Database size={48} className="text-muted-foreground mb-4" />
-                            <p className="text-[10px] font-black uppercase tracking-widest">Topology Visualization Offline</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest">
+                                {status?.dtc?.synced ? "Bridge Connection Active" : "Topology Visualization Offline"}
+                            </p>
                         </div>
+                        {status?.dtc?.synced && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <Activity className="text-primary/20 animate-pulse" size={120} />
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -88,9 +121,9 @@ export default function ConnectionsPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <GatewayItem label="Account" value="Real #844192" status="ok" />
-                        <GatewayItem label="Server" value="ICMarkets-SC-Live" status="ok" />
-                        <GatewayItem label="Mode" value="Full DMA" status="ok" />
+                        <GatewayItem label="Account" value={status?.mt5?.account || "N/A"} status={status?.mt5?.connected ? "ok" : "error"} />
+                        <GatewayItem label="Server" value={status?.mt5?.server || "N/A"} status={status?.mt5?.connected ? "ok" : "error"} />
+                        <GatewayItem label="Terminal" value={status?.mt5?.terminal_path ? "Detected" : "Missing"} status={status?.mt5?.terminal_path ? "ok" : "warn"} />
                     </CardContent>
                 </Card>
 
@@ -101,8 +134,8 @@ export default function ConnectionsPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <GatewayItem label="Auth" value="Signed Session" status="ok" />
-                        <GatewayItem label="Encyption" value="TLS 1.3" status="ok" />
+                        <GatewayItem label="Auth" value="DTC_PROT_v8" status="ok" />
+                        <GatewayItem label="Engine Lock" value={status?.engine?.lock_file ? "HELD" : "RELEASED"} status={status?.engine?.lock_file ? "ok" : "warn"} />
                         <GatewayItem label="IP Lock" value="127.0.0.1" status="ok" />
                     </CardContent>
                 </Card>

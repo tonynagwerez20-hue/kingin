@@ -6,7 +6,7 @@ This document provides a detailed technical blueprint for transforming the local
 
 ## 🗺️ Visual Architecture: Distributed Multi-Asset Stack
 
-```mermaid
+```mermaid 
 graph TD
     Client[User Dashboard / Next.js] -- "JWT Auth" --> Nginx[Nginx Gateway / SSL]
     Nginx -- "Port 8000" --> FastAPI[API Management Layer]

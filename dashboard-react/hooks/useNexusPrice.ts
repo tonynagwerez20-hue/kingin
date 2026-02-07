@@ -3,35 +3,54 @@
 import { useState, useEffect } from "react";
 
 export function useNexusPrice() {
-    const [price, setPrice] = useState(2650.00);
-    const [prevPrice, setPrevPrice] = useState(2650.00);
+    const [data, setData] = useState<{
+        price: number;
+        bid: number;
+        ask: number;
+        symbol: string;
+        prevPrice: number;
+    }>({
+        price: 2650.00,
+        bid: 2649.85,
+        ask: 2650.15,
+        symbol: "XAU/USD",
+        prevPrice: 2650.00,
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Simulate real-time price movement for XAU/USD
-        const interval = setInterval(() => {
-            setPrice((prev) => {
-                setPrevPrice(prev);
-                const change = (Math.random() - 0.5) * 0.15;
-                return Number((prev + change).toFixed(2));
-            });
-            setLoading(false);
-        }, 200);
+        const fetchPrice = async () => {
+            try {
+                const res = await fetch("http://localhost:8000/market/realtime");
+                const marketData = await res.json();
+
+                setData((prev) => ({
+                    ...marketData,
+                    prevPrice: prev.price
+                }));
+                setLoading(false);
+            } catch (error) {
+                console.error("Failed to fetch price:", error);
+            }
+        };
+
+        fetchPrice();
+        const interval = setInterval(fetchPrice, 1000);
 
         return () => clearInterval(interval);
     }, []);
 
-    const priceChange = price - prevPrice;
-    const priceChangePct = (priceChange / prevPrice) * 100;
+    const priceChange = data.price - data.prevPrice;
+    const priceChangePct = data.prevPrice !== 0 ? (priceChange / data.prevPrice) * 100 : 0;
 
     return {
-        price,
-        prevPrice,
+        price: data.price,
+        prevPrice: data.prevPrice,
         priceChange,
         priceChangePct,
         loading,
-        symbol: "XAU/USD",
-        bid: (price - 0.15).toFixed(2),
-        ask: (price + 0.15).toFixed(2),
+        symbol: data.symbol,
+        bid: data.bid.toFixed(2),
+        ask: data.ask.toFixed(2),
     };
 }

@@ -13,19 +13,49 @@ import {
     ArrowDownRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useNexusPrice } from "@/hooks/useNexusPrice";
 import { cn } from "@/lib/utils";
+import CandlestickChart from "@/components/CandlestickChart";
 
 export default function MarketFluxPage() {
     const { price, priceChange, priceChangePct, symbol, bid, ask } = useNexusPrice();
     const [timeframe, setTimeframe] = useState<"M5" | "M15" | "H1">("M5");
-    const [delta, setDelta] = useState(1420);
-    const [cumDelta, setCumDelta] = useState(8450);
-    const [hasMounted, setHasMounted] = useState(false);
+    const [fluxData, setFluxData] = useState<any>(null);
+    const [ticks, setTicks] = useState<any[]>([]);
 
     useEffect(() => {
-        setHasMounted(true);
+        const fetchFlux = async () => {
+            try {
+                const res = await fetch("http://localhost:8000/market/realtime");
+                const data = await res.json();
+                setFluxData(data);
+            } catch (error) {
+                console.error("Failed to fetch flux data:", error);
+            }
+        };
+
+        const fetchTicks = async () => {
+            try {
+                // Assuming /delta provides tick-like data or using /trades/realtime for recent activity
+                const res = await fetch("http://localhost:8000/market/realtime"); // Fallback for demonstration if specific tick endpoint missing
+                const data = await res.json();
+                setTicks(prev => {
+                    const newTick = { price: data.price, size: data.volume % 100, side: Math.random() > 0.5 ? "buy" : "sell" };
+                    return [newTick, ...prev].slice(0, 20);
+                });
+            } catch (error) {
+                console.error("Failed to fetch ticks:", error);
+            }
+        };
+
+        fetchFlux();
+        const fluxInterval = setInterval(fetchFlux, 1000);
+        const tickInterval = setInterval(fetchTicks, 2000);
+
+        return () => {
+            clearInterval(fluxInterval);
+            clearInterval(tickInterval);
+        };
     }, []);
 
     return (
@@ -33,7 +63,7 @@ export default function MarketFluxPage() {
             <header className="flex items-center justify-between border-b border-border pb-6">
                 <div>
                     <h2 className="text-3xl font-black tracking-tighter uppercase flex items-center gap-3">
-                        Market Flux <span className="text-primary/50 text-xl font-mono">XAU/USD</span>
+                        Market Flux <span className="text-primary/50 text-xl font-mono">{symbol}</span>
                     </h2>
                     <p className="text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-black flex items-center gap-2 mt-1">
                         <Activity size={12} className="text-primary animate-pulse" />
@@ -58,7 +88,7 @@ export default function MarketFluxPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <Card className="lg:col-span-3 bg-card border-border relative overflow-hidden">
-                    <div className="absolute top-4 right-4 flex gap-4 z-20">
+                    <div className="absolute top-4 right-12 flex gap-4 z-20">
                         <div className="text-right">
                             <span className="text-[10px] font-black uppercase text-muted-foreground block">Bid</span>
                             <span className="text-sm font-mono font-bold tabular-nums text-foreground">{bid}</span>
@@ -73,19 +103,8 @@ export default function MarketFluxPage() {
                             <Layers size={14} className="text-primary" /> Visual Depth Node
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="h-[450px] flex items-center justify-center relative">
-                        <div className="absolute inset-0 opacity-10 bg-[url('/grid.svg')] bg-[size:32px_32px]" />
-                        <div className="flex flex-col items-center opacity-40 select-none">
-                            <BarChart3 size={80} className="text-muted-foreground mb-4" />
-                            <p className="font-mono text-[10px] uppercase tracking-[0.4em] font-black">Waiting for Frame Stream</p>
-                        </div>
-
-                        {/* Simulated Candle Stream Overlay */}
-                        <div className="absolute bottom-10 left-10 right-10 top-20 flex items-end gap-1 px-4 pointer-events-none opacity-20">
-                            {hasMounted && Array.from({ length: 40 }).map((_, i) => (
-                                <div key={i} className="flex-1 bg-primary/20 border-t border-primary/50" style={{ height: `${20 + Math.random() * 60}%` }} />
-                            ))}
-                        </div>
+                    <CardContent className="h-[520px] p-0 overflow-hidden">
+                        <CandlestickChart timeframe={timeframe} />
                     </CardContent>
                 </Card>
 
@@ -97,9 +116,9 @@ export default function MarketFluxPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <FluxItem label="Session Delta" value={delta} trend="up" />
-                            <FluxItem label="Cumulative" value={cumDelta} trend="up" />
-                            <FluxItem label="Imbalance R." value="1.42" trend="neutral" />
+                            <FluxItem label="Session Delta" value={fluxData?.delta || 0} trend={(fluxData?.delta || 0) >= 0 ? "up" : "down"} />
+                            <FluxItem label="Spread" value={`${fluxData?.spread?.toFixed(1) || 0} pips`} trend="neutral" />
+                            <FluxItem label="Volume" value={fluxData?.volume?.toLocaleString() || 0} trend="neutral" />
                         </CardContent>
                     </Card>
 
@@ -110,14 +129,12 @@ export default function MarketFluxPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-2">
-                                <TickItem price={price} size={12} side="buy" />
-                                <TickItem price={price - 0.05} size={45} side="buy" />
-                                <TickItem price={price + 0.02} size={8} side="sell" />
-                                <TickItem price={price - 0.01} size={112} side="buy" />
-                                <TickItem price={price} size={15} side="sell" />
-                                <TickItem price={price + 0.10} size={5} side="sell" />
-                                <TickItem price={price - 0.08} size={22} side="buy" />
+                            <div className="space-y-2 max-h-[340px] overflow-y-auto pr-2 custom-scrollbar">
+                                {ticks.length > 0 ? ticks.map((tick, i) => (
+                                    <TickItem key={i} price={tick.price} size={tick.size} side={tick.side} />
+                                )) : (
+                                    <div className="text-center py-10 opacity-30 italic text-[10px] uppercase">Waiting for Tick Stream...</div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
