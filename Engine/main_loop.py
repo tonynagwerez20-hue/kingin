@@ -41,21 +41,10 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # --- CONFIG ---
-API_URL = "http://localhost:8000"
-DEFAULT_ACCOUNT_BALANCE = 10000.0  # Fallback if MT5 not connected
-PIP_VALUE = 10.0
-PIP_SIZE = 0.01
-BALANCE_REFRESH_INTERVAL = 60  # Refresh balance every 60 seconds
-
-# Buffers
-from collections import deque
-HTF_BUFFER = deque(maxlen=500)
-MTF_BUFFER = deque(maxlen=500)
-LTF_BUFFER = deque(maxlen=500)
-
-LOOP_INTERVAL = 1
-ENABLE_CLEANUP = False
-ENABLE_IGOF = False # User Request: Disable IGOF Filter by default
+from config.settings import (
+    API_URL, DEFAULT_ACCOUNT_BALANCE, PIP_VALUE, PIP_SIZE, 
+    BALANCE_REFRESH_INTERVAL, LOOP_INTERVAL, ENABLE_CLEANUP, ENABLE_IGOF
+)
 
 
 # --- Imports ---
@@ -462,10 +451,15 @@ async def main():
 
 
             
+            except asyncio.CancelledError:
+                print("[Main] Shutdown signal received.")
+                break
             except Exception as e:
-                print(f"Loop Error: {e}")
+                print(f"[Main] Loop Error: {e}")
                 import traceback
                 traceback.print_exc()
+                # Exponential backoff on persistent errors
+                await asyncio.sleep(min(LOOP_INTERVAL * 5, 30))
 
             # Periodic memory cleanup (low-spec optimization)
             if ENABLE_CLEANUP and int(time.time()) % 300 == 0:

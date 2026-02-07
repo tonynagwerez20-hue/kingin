@@ -14,23 +14,9 @@ from logging.handlers import RotatingFileHandler
 import threading
 from core.alert_manager import alert_manager
 
-# Get project root
-PROJECT_ROOT = Path(__file__).parent
-LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-# Configure logging
-log_file = LOG_DIR / "supervisor.log"
-handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        handler,
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# --- CONFIG ---
+from config.settings import PROJECT_ROOT, LOG_DIR
+from core.alert_manager import alert_manager
 
 # Configuration
 MAX_RESTART_ATTEMPTS = 5  # Max restarts within the time window

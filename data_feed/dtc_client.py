@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import data_feed.dtc_protocol as dtc
 from concurrent.futures import ThreadPoolExecutor
+from config.settings import DTC_HOST, DTC_PORT_LIVE, DTC_PORT_HIST, DEFAULT_SYMBOLS
 
 class DTCState(Enum):
     DISCONNECTED = auto()
@@ -121,7 +122,7 @@ class DepthEngine:
             }
 
 class DTCClient:
-    def __init__(self, host="127.0.0.1", port_live=11099, port_hist=11098, symbols=["GC", "ZN", "6E", "ES"], skip_history=False):
+    def __init__(self, host=DTC_HOST, port_live=DTC_PORT_LIVE, port_hist=DTC_PORT_HIST, symbols=DEFAULT_SYMBOLS, skip_history=False):
         self.host, self.port_live, self.port_hist = host, port_live, port_hist
         self.symbols = symbols if isinstance(symbols, list) else [symbols]
         self.skip_history = skip_history
@@ -164,11 +165,12 @@ class DTCClient:
             
         print(f"[DTC] Client Initialized. History Queue defined: {[ (r, i) for r, i in self.hist_queue ]}")
 
-    def connect(self, host="127.0.0.1", port=11099, is_live=True):
+    def connect(self, host=DTC_HOST, port=None, is_live=True):
         """Connect to Sierra Chart DTC Server (Fixed to localhost for stability)"""
-        host = "127.0.0.1" # v3.1 Hardening: Force localhost to avoid DNS/Routing overhead
+        if port is None:
+            port = self.port_live if is_live else self.port_hist
         target_host = host
-        target_port = self.port_live if is_live else self.port_hist
+        target_port = port
         sock_name = "LIVE" if is_live else "HIST"
 
         try:
