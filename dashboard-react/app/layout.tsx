@@ -1,8 +1,8 @@
-import React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+import Sidebar from "../components/Sidebar";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,12 +17,15 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
-            <body className={inter.className}>
+        <html lang="en" className="dark">
+            <body className={cn(inter.className, "bg-background text-foreground antialiased")}>
                 <div className="flex h-screen overflow-hidden">
                     <Sidebar />
-                    <main className="flex-1 overflow-y-auto p-8">
-                        {children}
+                    <main className="flex-1 relative overflow-y-auto bg-[#0a0f14]">
+                        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] pointer-events-none opacity-20" />
+                        <div className="relative z-10 p-8">
+                            {children}
+                        </div>
                     </main>
                 </div>
             </body>

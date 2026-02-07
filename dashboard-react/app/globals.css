@@ -3,35 +3,69 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 210 33% 4%;
+    --foreground: 210 40% 98%;
+    --card: 210 33% 6%;
+    --card-foreground: 210 40% 98%;
+    --popover: 210 33% 4%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 180 100% 50%;
+    /* Teal Success */
+    --primary-foreground: 180 100% 5%;
+    --secondary: 210 33% 12%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 210 33% 12%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 210 33% 12%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    /* Red Sell/Danger */
+    --destructive-foreground: 210 40% 98%;
+    --border: 210 33% 12%;
+    --input: 210 33% 12%;
+    --ring: 180 100% 50%;
+    --radius: 0.5rem;
+    --warning: 38 92% 50%;
+    /* Amber Warning */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
   body {
-    @apply bg-background text-textPrimary;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-@layer utilities {
-  .glass {
-    @apply bg-surface/50 backdrop-blur-sm border border-border;
-  }
-  
-  .card {
-    @apply bg-surface border border-border rounded-lg p-6;
-  }
-  
-  .price-up {
-    animation: flash-green 0.5s ease-out;
-  }
-  
-  .price-down {
-    animation: flash-red 0.5s ease-out;
-  }
+/* Custom Scrollbar for Terminal Feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-@keyframes flash-green {
-  0%, 100% { background-color: transparent; }
-  50% { background-color: rgba(16, 185, 129, 0.2); }
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-@keyframes flash-red {
-  0%, 100% { background-color: transparent; }
-  50% { background-color: rgba(239, 68, 68, 0.2); }
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}
+
+@layer components {
+  .card-terminal {
+    @apply bg-card border border-border rounded-lg p-4 shadow-lg hover:border-primary/20 transition-all duration-300;
+  }
+
+  .badge-terminal {
+    @apply px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border border-current;
+  }
 }

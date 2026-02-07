@@ -9,6 +9,7 @@ interface LatencyData {
     history: number[];
     last_ping: number;
     status: "GOOD" | "WARNING" | "CRITICAL" | "DISCONNECTED" | "ERROR";
+    error?: string;
 }
 
 export default function LatencyMonitor() {
@@ -115,10 +116,10 @@ export default function LatencyMonitor() {
                 <div className="pt-2 border-t border-border">
                     <span
                         className={`text-xs font-bold uppercase px-3 py-1.5 rounded ${latency.status === "GOOD"
-                                ? "bg-success/20 text-success"
-                                : latency.status === "WARNING"
-                                    ? "bg-warning/20 text-warning"
-                                    : "bg-danger/20 text-danger"
+                            ? "bg-success/20 text-success"
+                            : latency.status === "WARNING"
+                                ? "bg-warning/20 text-warning"
+                                : "bg-danger/20 text-danger"
                             }`}
                     >
                         {latency.status}
