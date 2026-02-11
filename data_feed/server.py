@@ -841,6 +841,48 @@ async def run_simulation(request: Request):
     except Exception as e:
         return JSONResponse({"status": "ERROR", "message": str(e)}, status_code=500)
 
+# Track active backtest process
+backtest_process = None
+
+@app.post("/backtest/run")
+async def run_backtest_endpoint(request: Request):
+    """Launches the backtest orchestrator in a sub-process."""
+    global backtest_process
+    
+    try:
+        # 1. Kill existing if running
+        if backtest_process and backtest_process.poll() is None:
+            print("[Server] Terminating existing backtest process...")
+            backtest_process.terminate()
+            try:
+                backtest_process.wait(timeout=3)
+            except:
+                backtest_process.kill()
+        
+        # 2. Launch run_backtest.py
+        # Use venv python if possible
+        python_cmd = sys.executable
+        venv_python = project_root / ".venv" / "Scripts" / "python.exe"
+        if venv_python.exists():
+            python_cmd = str(venv_python)
+            
+        print(f"[Server] Launching backtest: {python_cmd} run_backtest.py --mode=DTC")
+        
+        # CREATE_NEW_PROCESS_GROUP or similar to avoid signal propagation if needed, 
+        # but for simple trigger, Popen is fine.
+        backtest_process = subprocess.Popen(
+            [python_cmd, "run_backtest.py", "--mode=DTC"],
+            cwd=project_root,
+            # Don't capture stdout to avoid pipe filling up and blocking, 
+            # or redirect to a log file.
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        
+        return JSONResponse({"status": "SUCCESS", "message": "Backtest initiated in background."})
+    except Exception as e:
+        return JSONResponse({"status": "ERROR", "message": str(e)}, status_code=500)
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):

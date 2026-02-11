@@ -14,12 +14,13 @@ import {
     Hash,
     BarChart3
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useNexusPrice } from "@/hooks/useNexusPrice";
-import { cn } from "@/lib/utils";
-import ConnectionStatus from "@/components/ConnectionStatus";
-import StrategyAuditFeed from "@/components/StrategyAuditFeed";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { useNexusPrice } from "../hooks/useNexusPrice";
+import { cn } from "../lib/utils";
+import ConnectionStatus from "../components/ConnectionStatus";
+import StrategyAuditFeed from "../components/StrategyAuditFeed";
+import ControlPanel from "../components/ControlPanel";
 
 export default function HomePage() {
     const { price, priceChange, priceChangePct, symbol } = useNexusPrice();
@@ -141,8 +142,13 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <ConnectionStatus className="lg:col-span-2" />
-                <StrategyAuditFeed />
+                <div className="lg:col-span-2 space-y-6">
+                    <ConnectionStatus />
+                </div>
+                <div className="space-y-6">
+                    <ControlPanel />
+                    <StrategyAuditFeed />
+                </div>
             </div>
         </div>
     );
