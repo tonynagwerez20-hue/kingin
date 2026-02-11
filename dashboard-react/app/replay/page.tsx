@@ -12,7 +12,7 @@ import {
     CheckCircle2,
     AlertTriangle
 } from "lucide-react";
-import { MetricsCard } from "@/components/MetricsCard";
+import MetricsCard from "@/components/MetricsCard";
 import {
     LineChart,
     Line,

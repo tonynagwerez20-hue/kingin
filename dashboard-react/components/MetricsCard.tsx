@@ -1,23 +1,42 @@
 "use client";
 
+import { LucideIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
 interface MetricsCardProps {
-    label: string;
+    title: string;
     value: string;
-    color: "success" | "danger" | "warning" | "primary";
+    icon?: LucideIcon;
+    trend?: number;
+    className?: string;
+    label?: string; // Validation: kept for safety but not used in new design
+    color?: string; // Validation: kept for safety
 }
 
-const colorClasses = {
-    success: "border-success text-success",
-    danger: "border-danger text-danger",
-    warning: "border-warning text-warning",
-    primary: "border-primary text-primary",
-};
+export default function MetricsCard({ title, value, icon: Icon, trend, className, label }: MetricsCardProps) {
+    // Fallback for legacy prop usage if any
+    const displayTitle = title || label;
 
-export default function MetricsCard({ label, value, color }: MetricsCardProps) {
     return (
-        <div className={`card border-l-4 ${colorClasses[color]}`}>
-            <p className="text-sm text-textSecondary mb-1">{label}</p>
-            <p className="text-2xl font-bold font-mono">{value}</p>
-        </div>
+        <Card className={cn("bg-card border-border", className)}>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-black flex items-center gap-2">
+                    {Icon && <Icon size={12} className="text-primary" />}
+                    {displayTitle}
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-black tracking-tight">{value}</div>
+                {trend !== undefined && trend !== 0 && (
+                    <p className={cn(
+                        "text-[10px] font-bold mt-1 tracking-tight",
+                        trend > 0 ? "text-primary" : "text-destructive"
+                    )}>
+                        {trend > 0 ? "+" : ""}{trend}%
+                    </p>
+                )}
+            </CardContent>
+        </Card>
     );
 }

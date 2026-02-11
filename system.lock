@@ -1,8 +1,8 @@
 {
-    "started": 1770496455.683488,
+    "started": 1770778462.4854753,
     "processes": {
-        "Data Feed Server": 17128,
-        "Trading Engine": 1308,
-        "React Dashboard": 9916
+        "Data Feed Server": 14384,
+        "Trading Engine": 15052,
+        "React Dashboard": 13996
     }
 }

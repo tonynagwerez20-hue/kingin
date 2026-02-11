@@ -6,13 +6,17 @@ import time
 import importlib.util
 import gc
 import subprocess
-import pkg_resources
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
 import argparse
+import aiohttp
 
 def check_dependencies():
     """Verify all requirements are installed, attempt auto-fix if missing."""
     requirements_file = Path(__file__).parent.parent / "requirements.txt"
-    if not requirements_file.exists():
+    if not pkg_resources or not requirements_file.exists():
         return
     
     with open(requirements_file, "r") as f:
@@ -49,7 +53,6 @@ from config.settings import (
 
 
 # --- Imports ---
-# --- Imports ---
 # Dynamic import for dispatcher
 try:
     from networking.dispatcher import DataDispatcher, delta_buffers, ohlc_buffers, dispatch_batch
@@ -68,6 +71,11 @@ except ImportError:
          from dispatcher import DataDispatcher, delta_buffers, ohlc_buffers, dispatch_batch
 
     from server import build_delta_struct
+
+# Define Buffer Aliases
+HTF_BUFFER = ohlc_buffers["H1"]
+MTF_BUFFER = ohlc_buffers["M15"]
+LTF_BUFFER = ohlc_buffers["M5"]
 
 # Logic imports
 try:
@@ -92,7 +100,9 @@ try:
 except ImportError as e:
     print(f"Import Error: {e}")
 
-# ... (Previous imports and config remain) ...
+
+async def main():
+    check_dependencies()
 
     # Parse CLI Arguments
     parser = argparse.ArgumentParser(description="Hedge Gold Trading Engine")
@@ -114,8 +124,12 @@ except ImportError as e:
     # Initialize Bridge
     bridge = None
     try:
-        print("[Pre-Flight] Testing MT5 Bridge connection...")
-        bridge = Bridge(pub_port=5555, req_port=5557)
+        print(f"[Pre-Flight] Testing MT5 Bridge connection... (Backtest: {backtest_mode})")
+        if backtest_mode:
+            # Use alternative ports to avoid conflict with running system
+            bridge = Bridge(pub_port=5565, req_port=5567)
+        else:
+            bridge = Bridge(pub_port=5555, req_port=5557)
         
         if not backtest_mode:
             if not bridge.connected:
@@ -137,12 +151,12 @@ except ImportError as e:
                 print("   Ensure EA shows smiley face (not sad face)\n")
                 sys.exit(1)
             
-            print("✅ [Pre-Flight] MT5 Bridge: CONNECTED")
+            print("[OK] [Pre-Flight] MT5 Bridge: CONNECTED")
         else:
-            print("✅ [Pre-Flight] MT5 Bridge: OFFLINE (Backtest Mode Active)")
+            print("[OK] [Pre-Flight] MT5 Bridge: OFFLINE (Backtest Mode Active)")
         
     except Exception as e:
-        print(f"\n❌ [CRITICAL] MT5 Bridge initialization failed: {e}")
+        print(f"\n[X] [CRITICAL] MT5 Bridge initialization failed: {e}")
         print("   Run diagnostic script: python tests/diag_system_health.py\n")
         sys.exit(1)
     
@@ -168,7 +182,7 @@ except ImportError as e:
     # Initialize IGOF Controller
     filtration = FiltrationController()
     
-    print(f"✅ [Pre-Flight] 5-layer Risk Defense & Modular Alpha and IGOF initialized.")
+    print(f"[OK] [Pre-Flight] 5-layer Risk Defense & Modular Alpha and IGOF initialized.")
     
     # Fetch initial account balance from MT5
     account_balance = DEFAULT_ACCOUNT_BALANCE
@@ -182,7 +196,7 @@ except ImportError as e:
         fetched_balance = bridge.get_account_balance()
         if fetched_balance is not None:
             account_balance = fetched_balance
-            print(f"✅ [Pre-Flight] MT5 account balance: ${account_balance:,.2f}")
+            print(f"[OK] [Pre-Flight] MT5 account balance: ${account_balance:,.2f}")
             if db:
                 db.set_state("account_balance", account_balance)
                 db.set_state("balance_last_sync", time.time())
@@ -229,7 +243,7 @@ except ImportError as e:
                 
                 # Check if minimum data is available (H1 can be less than 500 initially)
                 if h1_count > 0 and m15_count > 0 and m5_count > 0:
-                    print(f"[Main] ✅ DTC Synced & Buffers Ready.")
+                    print(f"[Main] [OK] DTC Synced & Buffers Ready.")
                     break
                 else:
                     print(f"[Main] Waiting for bars... H1={h1_count} M15={m15_count} M5={m5_count}")
@@ -476,6 +490,8 @@ except ImportError as e:
 
 if __name__ == "__main__":
     try:
+        if sys.platform == 'win32':
+             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(main())
     except KeyboardInterrupt:
         pass

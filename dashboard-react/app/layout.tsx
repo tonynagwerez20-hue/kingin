@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "../components/Sidebar";
 import { cn } from "@/lib/utils";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
     title: "Trading Dashboard | XAUUSD Orderflow System",
@@ -18,7 +15,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" className="dark">
-            <body className={cn(inter.className, "bg-background text-foreground antialiased")}>
+            <body className={cn("font-sans antialiased", "bg-background text-foreground")}>
                 <div className="flex h-screen overflow-hidden">
                     <Sidebar />
                     <main className="flex-1 relative overflow-y-auto bg-[#0a0f14]">

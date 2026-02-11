@@ -2,6 +2,9 @@
     "name": "trading-dashboard",
     "version": "1.0.0",
     "private": true,
+    "description": "Professional real-time trading dashboard",
+    "author": "Nexus Terminal",
+    "license": "UNLICENSED",
     "scripts": {
         "dev": "next dev",
         "build": "next build",
