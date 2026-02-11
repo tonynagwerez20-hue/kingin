@@ -7,10 +7,13 @@ class StrategyManager:
 
     def aggregate_signals(self, htf_buffer: List[Dict], mtf_buffer: List[Dict], ltf_buffer: List[Dict], **kwargs) -> Optional[Dict]:
         """
-        Implements the 'Two Filters + One Trigger' logic:
-        1. Filter One (Bias) from FilterOne.
-        2. Filter Two (Zone) from FilterTwo.
-        3. Trigger (Delta/CVD) from OrderflowStrategy.
+        Implements the 'Triple-TF Filtration & Trigger' architecture:
+        1. HTF Filter (H1 Bias): Defines the structural trend (FilterOne).
+        2. MTF Filter (M15 Zone): Validates supply/demand context (FilterTwo).
+        3. LTF Trigger (M5 Delta/Candle): High-precision entry execution (CandlestickStrategy).
+        
+        Strict Alignment Rule: Entries are only permitted when all three layers (H1, M15, M5) 
+        synchronize in direction. Exits are triggered by a reversal in any layer.
         """
         from support.strategies.filter_one import FilterOne
         from support.strategies.filter_two import FilterTwo

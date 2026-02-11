@@ -35,7 +35,7 @@ Based on our complete review, here's your final status:
 ✅ Execution: MetaTrader 5 via ZMQ Bridge
 ✅ Primary UI: React (Next.js) Professional Dashboard
 ✅ Analysis UI: Streamlit Real-time Dashboard
-✅ Strategy: Orderflow-based M5 entries
+✅ Strategy: Triple-TF (H1/M15/M5) Hierarchical Alignment logic
 ```
 
 ---
@@ -203,7 +203,7 @@ Navigate to: `http://localhost:8501`
 - **Price updates**: Every 200ms (5 times per second)
 - **Chart updates**: Every 1 second (5 ticks)
 - **No flicker**: Smooth placeholder updates
-- **Latency**: <100ms from tick to display
+- **Latency**: 0ms Market Data Pipe (CONFLATE Optimized)
 
 ### Trading Engine
 - **Signal generation**: ~1 second loop

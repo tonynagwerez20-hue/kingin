@@ -106,7 +106,7 @@ Different assets often require different brokers or specialized MT5 account grou
 
 ---
 > [!IMPORTANT]
-> **Production Recommendation**: When scaling to multi-asset, prioritize **Data Drift Monitoring** for each symbol separately via Grafana to ensure high-volatility assets like BTC don't experience execution lag.
+> **Production Recommendation**: When scaling to multi-asset, ensure `zmq.CONFLATE` is active for each symbol's data stream to prevent execution lag.
 
 ---
 *End of Multi-Asset Master Scaling Specification v1.1*

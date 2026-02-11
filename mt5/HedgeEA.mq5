@@ -83,6 +83,7 @@ void LogWarning(string message);
 void LogError(string message);
 string GetOpenPositionsJson();
 string GetHistoryDealsJson(int days);
+void CheckForOfflineSignals();
 
 //+------------------------------------------------------------------+
 //| Input Parameters                                                 |
@@ -109,6 +110,10 @@ input int      SLIPPAGE_POINTS = 10;            // Maximum Slippage (points)
 input int      MAGIC_NUMBER = 123456;           // Magic Number
 input string   TRADE_COMMENT = "HedgeEA";       // Trade Comment
 input int      REVERSAL_DELAY_MS = 500;         // Delay between close and reversal (ms)
+
+// Backtesting / Replay Mode
+input bool     BACKTEST_MODE = false;           // Enable Offline Signal Loading (CSV)
+input string   BACKTEST_FILE = "backtest_signals.csv"; // Signal file in MQL5/Files
 
 // Logging
 input ENUM_LOG_LEVEL LOG_LEVEL = LOG_LEVEL_INFO;  // Log Level
@@ -195,14 +200,18 @@ void OnTick()
    if(ENABLE_TRAILING_SL)
       UpdateTrailingStops();
    
-   // Check for new signals (non-blocking)
-   CheckForSignals();
+   // Check for new signals
+   if(BACKTEST_MODE)
+      CheckForOfflineSignals();
+   else
+      CheckForSignals();
    
    // Process queued signals
    ProcessSignalQueue();
    
-   // Respond to heartbeats
-   CheckHeartbeat();
+   // Respond to heartbeats (skip in backtest)
+   if(!BACKTEST_MODE)
+      CheckHeartbeat();
 }
 
 //+------------------------------------------------------------------+
@@ -1128,4 +1137,59 @@ string GetHistoryDealsJson(int days)
       json += "]}";
       return json;
 }
+
+//+------------------------------------------------------------------+
+//| Check for signals in a local CSV file (Backtest/Replay Mode)     |
+//+------------------------------------------------------------------+
+int lastProcessedLine = 0;
+
+void CheckForOfflineSignals()
+{
+   int fileHandle = FileOpen(BACKTEST_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
+   if(fileHandle == INVALID_HANDLE)
+   {
+      static bool warned = false;
+      if(!warned) { LogWarning("Offline signal file not found: " + BACKTEST_FILE); warned = true; }
+      return;
+   }
+
+   int currentLine = 0;
+   while(!FileIsEnding(fileHandle))
+   {
+      string line = FileReadString(fileHandle);
+      if(line == "") continue;
+      
+      currentLine++;
+      
+      // Skip headers and already processed lines
+      if(currentLine <= 1 || currentLine <= lastProcessedLine)
+      {
+         // Skip remaining columns in this line
+         while(!FileIsLineEnding(fileHandle)) FileReadString(fileHandle);
+         continue;
+      }
+
+      // Parse columns: Time, Symbol, Action, Price, SL, Lots, Desc, MagicNumber
+      string sTime = line;
+      string sSymbol = FileReadString(fileHandle);
+      string sAction = FileReadString(fileHandle);
+      double dPrice = StringToDouble(FileReadString(fileHandle));
+      double dSL = StringToDouble(FileReadString(fileHandle));
+      double dLots = StringToDouble(FileReadString(fileHandle));
+      string sDesc = FileReadString(fileHandle);
+      long nMagic = (long)StringToInteger(FileReadString(fileHandle));
+
+      // Quick JSON-like wrap to reuse existing ProcessSignal logic
+      string pseudoJson = StringFormat("{\"action\":\"%s\",\"symbol\":\"%s\",\"price\":%.5f,\"sl\":%.5f,\"lots\":%.2f,\"desc\":\"%s\",\"magic\":%d}",
+                                       sAction, sSymbol, dPrice, dSL, dLots, sDesc, nMagic);
+      
+      LogInfo("Offline Signal Detected: " + sAction);
+      ProcessSignal(pseudoJson);
+      
+      lastProcessedLine = currentLine;
+   }
+   
+   FileClose(fileHandle);
+}
+
 //+------------------------------------------------------------------+

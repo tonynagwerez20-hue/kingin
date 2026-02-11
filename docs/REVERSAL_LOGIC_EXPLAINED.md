@@ -2,7 +2,7 @@
 
 ## Current Architecture: Two Filters + One Trigger
 
-Your system uses **candlestick patterns** as the trigger mechanism instead of orderflow delta. Here's how reversals are handled:
+Your system uses a **Triple-TF Hierarchical Alignment** protocol. Every entry must pass through a structural filter (H1), a strategic context filter (M15), and a high-precision trigger (M5).
 
 ---
 

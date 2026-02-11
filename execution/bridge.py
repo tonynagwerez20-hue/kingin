@@ -1,7 +1,8 @@
 import zmq
 import json
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+from support.backtest.signal_recorder import recorder
 
 class Bridge:
     """
@@ -60,11 +61,18 @@ class Bridge:
             print(f"[Bridge] Request error: {e}")
             return None
     
-    def send_signal(self, signal: dict):
+    def send_signal(self, signal: dict, record_only: bool = False):
         """
         Sends a JSON-encoded signal over ZMQ (fire-and-forget).
         Backward compatible with existing EA.
         """
+        # 1. Record the signal for backtesting/auditing
+        recorder.record(signal)
+        
+        if record_only:
+            print(f"[Bridge] Signal RECORDED (Offline Mode): {signal.get('action')}")
+            return
+
         # Apply Symbol Mapping if defined
         if self.trading_symbol and signal.get("symbol") == "XAUUSD":
             signal["symbol"] = self.trading_symbol
@@ -73,7 +81,7 @@ class Bridge:
         self.pub_socket.send_string(f"SIGNAL {message}")
         print(f"[Bridge] Signal sent: {message}")
     
-    def send_signal_with_ack(self, signal: dict, timeout: int = 5, max_retries: int = 3) -> Dict:
+    def send_signal_with_ack(self, signal: dict, timeout: int = 5, max_retries: int = 3, record_only: bool = False) -> Dict:
         """
         Send signal and wait for acknowledgment from MT5 EA.
         Implements retry logic with exponential backoff.
@@ -81,6 +89,12 @@ class Bridge:
         Returns:
             Dict with status, ticket, execution_price, etc.
         """
+        # 1. Record the signal for backtesting/auditing
+        recorder.record(signal)
+
+        if record_only:
+             print(f"[Bridge] Signal RECORDED (Offline Mode): {signal.get('action')}")
+             return {"status": "SUCCESS", "mode": "OFFLINE_RECORD"}
         # Apply Symbol Mapping if defined
         if self.trading_symbol and signal.get("symbol") == "XAUUSD":
             signal["symbol"] = self.trading_symbol

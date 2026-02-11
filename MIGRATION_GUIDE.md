@@ -59,6 +59,7 @@ Update the `.env` file on the new machine if local paths or Sierra Chart IP addr
 
 ## 🛠️ Troubleshooting Connection issues
 If the system fails to connect after migration:
-1. **ZMQ Port Error**: Check if Ports 5555, 5556, or 5557 are being used by another application.
-2. **DTC Timeout**: Ensure Sierra Chart -> Global Settings -> DTC Server -> "Allow Remote Connections" is checked if the Engine is on a different machine.
-3. **Module Error**: Run `pip install -r requirements.txt` again to ensure no libraries were skipped.
+1. **ZMQ Port Error**: Check if Ports 5555, 5556, or 5557 are being used by another application. Port 5556 is use for the Conflated Market Data Tunnel.
+2. **Execution Lag**: Ensure `zmq.CONFLATE` is set to 1 in the Engine settings to eliminate the 12-second drift.
+3. **DTC Timeout**: Ensure Sierra Chart -> Global Settings -> DTC Server -> "Allow Remote Connections" is checked if the Engine is on a different machine.
+4. **Module Error**: Run `pip install -r requirements.txt` again to ensure no libraries were skipped.

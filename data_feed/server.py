@@ -20,7 +20,7 @@ from typing import Any, Dict, List
 from collections import deque
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Query
 from fastapi.responses import JSONResponse
 import uvicorn
 
@@ -805,6 +805,39 @@ async def save_settings(request: Request):
         conn.close()
         
         return JSONResponse({"status": "SUCCESS", "message": "Settings saved successfully"})
+    except Exception as e:
+        return JSONResponse({"status": "ERROR", "message": str(e)}, status_code=500)
+
+
+@app.get("/backtest/signals")
+async def get_backtest_signals():
+    """Returns the list of recorded signals from the backtest CSV file."""
+    signals_path = project_root / "data" / "backtest_signals.csv"
+    if not signals_path.exists():
+        return JSONResponse({"status": "WARNING", "message": "No backtest signals found."})
+    
+    import pandas as pd
+    try:
+        df = pd.read_csv(signals_path)
+        return JSONResponse(df.to_dict(orient="records"))
+    except Exception as e:
+        return JSONResponse({"status": "ERROR", "message": str(e)}, status_code=500)
+
+@app.post("/backtest/simulate")
+async def run_simulation(request: Request):
+    """Triggers a Monte Carlo simulation on the recorded backtest signals."""
+    try:
+        from support.statistical.monte_carlo_engine import MonteCarloEngine
+        params = await request.json()
+        
+        engine = MonteCarloEngine()
+        results = engine.run_simulation(
+            iterations=params.get("iterations", 1000),
+            slippage_pips=params.get("slippage", 1.5),
+            initial_balance=params.get("initial_balance", 10000.0)
+        )
+        
+        return JSONResponse(results)
     except Exception as e:
         return JSONResponse({"status": "ERROR", "message": str(e)}, status_code=500)
 

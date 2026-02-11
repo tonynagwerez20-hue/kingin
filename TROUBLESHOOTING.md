@@ -89,6 +89,22 @@ npm install
 npm run dev
 ```
 
+## ZMQ Latency / "12-second Drift"
+
+If you notice that the dashboard or engine price lags behind Sierra Chart by exactly 12-15 seconds:
+
+### Cause
+ZeroMQ's internal buffer is filling up with stale ticks, creating "buffer bloat". This happens if the Engine processing loop is slightly slower than the incoming tick stream.
+
+### Solution
+Ensue the `CONFLATE` option is enabled on the ZMQ SUB socket in `Engine/main_loop.py`:
+```python
+subscriber.setsockopt(zmq.CONFLATE, 1)
+```
+This forces the socket to only keep the **latest** message, effectively dropping the backlog and resetting latency to 0ms.
+
+---
+
 ## Prevention
 
 To avoid this error in the future:

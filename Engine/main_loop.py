@@ -7,6 +7,7 @@ import importlib.util
 import gc
 import subprocess
 import pkg_resources
+import argparse
 
 def check_dependencies():
     """Verify all requirements are installed, attempt auto-fix if missing."""
@@ -93,14 +94,17 @@ except ImportError as e:
 
 # ... (Previous imports and config remain) ...
 
-async def main():
-    check_dependencies()
-    print("Starting Main Trading Loop with Modular Batch-Flow Architecture...")
-    import aiohttp
+    # Parse CLI Arguments
+    parser = argparse.ArgumentParser(description="Hedge Gold Trading Engine")
+    parser.add_argument("--backtest", action="store_true", help="Run in Backtest/Replay mode (records signals to CSV, skips MT5 execution)")
+    args = parser.parse_args()
     
-    # v3.9 Startup Logic: Wait for data feed server (Uvicorn) to bind port 8000
-    print("[Main] Waiting 3 seconds for Data Feed Server to bind...")
-    await asyncio.sleep(3)
+    backtest_mode = args.backtest
+    if backtest_mode:
+        print("\n" + "!"*60)
+        print("!!! RUNNING IN BACKTEST / REPLAY MODE !!!")
+        print("!!! Signals will be recorded to data/backtest_signals.csv !!!")
+        print("!"*60 + "\n")
 
     # ========== PRE-FLIGHT CHECKS ==========
     print("\n" + "="*60)
@@ -113,26 +117,29 @@ async def main():
         print("[Pre-Flight] Testing MT5 Bridge connection...")
         bridge = Bridge(pub_port=5555, req_port=5557)
         
-        if not bridge.connected:
-            print("\n[ERROR] [CRITICAL] MT5 Bridge NOT CONNECTED")
-            print("   Possible causes:")
-            print("   1. MetaTrader 5 is not running")
-            print("   2. Algo Trading is disabled (must be GREEN)")
-            print("   3. EA is not attached to chart")
-            print("   4. DLL imports not allowed in MT5 settings")
-            print("\n   Fix: Run diagnostic script first:")
-            print("   python tests/diag_system_health.py\n")
-            sys.exit(1)
-        
-        # Test heartbeat
-        heartbeat = bridge.check_connection()
-        if not heartbeat:
-            print("\n[ERROR] [CRITICAL] MT5 Bridge heartbeat FAILED")
-            print("   EA is not responding. Check MT5 'Experts' tab for errors.")
-            print("   Ensure EA shows smiley face (not sad face)\n")
-            sys.exit(1)
-        
-        print("✅ [Pre-Flight] MT5 Bridge: CONNECTED")
+        if not backtest_mode:
+            if not bridge.connected:
+                print("\n[ERROR] [CRITICAL] MT5 Bridge NOT CONNECTED")
+                print("   Possible causes:")
+                print("   1. MetaTrader 5 is not running")
+                print("   2. Algo Trading is disabled (must be GREEN)")
+                print("   3. EA is not attached to chart")
+                print("   4. DLL imports not allowed in MT5 settings")
+                print("\n   Fix: Run diagnostic script first:")
+                print("   python tests/diag_system_health.py\n")
+                sys.exit(1)
+            
+            # Test heartbeat
+            heartbeat = bridge.check_connection()
+            if not heartbeat:
+                print("\n[ERROR] [CRITICAL] MT5 Bridge heartbeat FAILED")
+                print("   EA is not responding. Check MT5 'Experts' tab for errors.")
+                print("   Ensure EA shows smiley face (not sad face)\n")
+                sys.exit(1)
+            
+            print("✅ [Pre-Flight] MT5 Bridge: CONNECTED")
+        else:
+            print("✅ [Pre-Flight] MT5 Bridge: OFFLINE (Backtest Mode Active)")
         
     except Exception as e:
         print(f"\n❌ [CRITICAL] MT5 Bridge initialization failed: {e}")
@@ -427,7 +434,7 @@ async def main():
                     
                     # Dispatch to Bridge
                     if bridge:
-                        bridge.send_signal(signal_evt)
+                        bridge.send_signal(signal_evt, record_only=backtest_mode)
                         
                     # Update Internal Position Tracker
                     if "CLOSE" in action:

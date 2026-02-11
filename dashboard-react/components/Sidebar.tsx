@@ -18,6 +18,7 @@ const navItems = [
     { href: "/", label: "Nexus Node", icon: Cpu },
     { href: "/live", label: "Market Flux", icon: Activity },
     { href: "/intelligence", label: "Signal Intel", icon: ShieldCheck },
+    { href: "/replay", label: "Stress Test", icon: Activity }, // New Replay/Stress Test Page
     { href: "/exec", label: "Execution", icon: Zap },
     { href: "/history", label: "Master Ledger", icon: History },
     { href: "/connections", label: "Infrastructure", icon: Server },
