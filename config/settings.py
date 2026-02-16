@@ -21,7 +21,7 @@ LOOP_INTERVAL = 1
 
 # --- SYSTEM FLAGS ---
 ENABLE_CLEANUP = False
-ENABLE_IGOF = False  # Disabled by default per user request
+ENABLE_IGOF = True  # Active filtration enabled per user request
 
 # --- SYMBOLS ---
 DEFAULT_SYMBOLS = ["XAUUSD", "GC", "ZN", "6E", "ES"]

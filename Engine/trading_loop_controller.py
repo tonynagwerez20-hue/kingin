@@ -166,19 +166,31 @@ class TradingLoopController:
             "regime": self.regime_layer.current_regime if hasattr(self.regime_layer, 'current_regime') else None
         }
     
-    async def execute_signal(self, signal: Dict, market_data: Dict) -> bool:
+    async def execute_signal(self, signal: Dict, market_data: Dict, filtration_result: Optional[Dict] = None) -> bool:
         """
         Execute a trading signal if all checks pass.
         
         Args:
             signal: Trading signal dictionary
             market_data: Current market data
+            filtration_result: Optional IGOF filtration result
         
         Returns:
             True if signal executed, False otherwise
         """
         if not signal:
             return False
+        
+        # Check IGOF Filtration (Active Blocking)
+        from config.settings import ENABLE_IGOF
+        if ENABLE_IGOF and filtration_result:
+            if filtration_result.get("action") == "NO_TRADE":
+                print(f"[TradingLoop] Signal BLOCKED by IGOF: {filtration_result.get('reason')}")
+                if self.audit_logger:
+                    self.audit_logger.log_event("IGOF", "SIGNAL_BLOCKED", filtration_result)
+                return False
+            else:
+                print(f"[TradingLoop] IGOF Passed: {filtration_result.get('reason')}")
         
         # Check risk veto
         veto_reason = self.check_risk_veto()
@@ -234,7 +246,7 @@ class TradingLoopController:
                             "h1_candles": h1_candles,
                             "m15_candles": m15_candles,
                             "m5_candles": m5_candles
-                        })
+                        }, filtration_result=result.get("filtration"))
                     
                     # 5. Sleep before next iteration
                     await asyncio.sleep(self.loop_interval)
