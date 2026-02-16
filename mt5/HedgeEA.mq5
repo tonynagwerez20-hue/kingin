@@ -124,6 +124,7 @@ input int      REVERSAL_DELAY_MS = 500;         // Delay between close and rever
 // Backtesting / Replay Mode
 input bool     BACKTEST_MODE = false;           // Enable Offline Signal Loading (CSV)
 input string   BACKTEST_FILE = "backtest_signals.csv"; // Signal file in MQL5/Files
+input string   ISIGNAL_FILE = "isignals_backtest.csv"; // Forensic iSignal file
 input int      SIGNAL_TIME_SHIFT = 0;           // Shift signal time in hours (e.g. +2, -5)
 input bool     ENABLE_VISUAL_REPLAY = false;    // Bypass time checks for visual backtesting
 
@@ -155,6 +156,12 @@ datetime currentDay = 0;
 ulong  currentPositionTicket = 0;
 string currentPositionDirection = "";  // "LONG" or "SHORT"
 long   lastProcessedLine = 0;          // Changed to long to avoid truncation warnings
+
+// Forensic State (iSignals)
+string g_forensic_layers[6] = {"N/A", "N/A", "N/A", "N/A", "N/A", "N/A"};
+string g_forensic_action = "WAITING";
+string g_forensic_reason = "No data";
+datetime g_last_forensic_time = 0;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -250,7 +257,10 @@ void OnTick()
    
    // Check for new signals
    if(IsBacktestActive)
+   {
       CheckForOfflineSignals();
+      CheckForForensicSignals();
+   }
    else
       CheckForSignals();
    
@@ -272,6 +282,7 @@ void OnTimer()
    if(IsBacktestActive)
    {
       CheckForOfflineSignals();
+      CheckForForensicSignals();
       ProcessSignalQueue();
    }
 }
@@ -1411,4 +1422,89 @@ void CheckForOfflineSignals()
    FileClose(fileHandle);
 }
 
+//+------------------------------------------------------------------+
+//| Check for forensic signals (iSignals)                            |
+//+------------------------------------------------------------------+
+void CheckForForensicSignals()
+{
+   if(TimeCurrent() == g_last_forensic_time) return;
+   
+   // Try Common Folder first
+   int fileHandle = FileOpen(ISIGNAL_FILE, FILE_READ|FILE_CSV|FILE_ANSI|FILE_COMMON, ',');
+   if(fileHandle == INVALID_HANDLE)
+   {
+      fileHandle = FileOpen(ISIGNAL_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
+   }
+   
+   if(fileHandle == INVALID_HANDLE) return;
+   
+   datetime targetTime = TimeCurrent() + (SIGNAL_TIME_SHIFT * 3600);
+   bool found = false;
+   
+   // We skip header and look for the closest time
+   FileReadString(fileHandle); // Skip Time
+   while(!FileIsLineEnding(fileHandle)) FileReadString(fileHandle);
+   
+   while(!FileIsEnding(fileHandle))
+   {
+      string sTime = FileReadString(fileHandle);
+      if(sTime == "") continue;
+      
+      StringReplace(sTime, "-", ".");
+      datetime rowTime = StringToTime(sTime);
+      
+      // If we found the exact bar or the last known bar before current time
+      if(rowTime <= targetTime)
+      {
+         // Read columns: Price, L0, L1, L2, L3, L4, L5, Final, Reason
+         FileReadString(fileHandle); // Price
+         g_forensic_layers[0] = FileReadString(fileHandle);
+         g_forensic_layers[1] = FileReadString(fileHandle);
+         g_forensic_layers[2] = FileReadString(fileHandle);
+         g_forensic_layers[3] = FileReadString(fileHandle);
+         g_forensic_layers[4] = FileReadString(fileHandle);
+         g_forensic_layers[5] = FileReadString(fileHandle);
+         g_forensic_action    = FileReadString(fileHandle);
+         g_forensic_reason    = FileReadString(fileHandle);
+         
+         found = true;
+         // Continue searching to get the latest possible row <= targetTime
+      }
+      else
+      {
+         // Row time is in future relative to our target, stop
+         break;
+      }
+      
+      // Consume rest of line
+      while(!FileIsLineEnding(fileHandle) && !FileIsEnding(fileHandle)) FileReadString(fileHandle);
+   }
+   
+   FileClose(fileHandle);
+   g_last_forensic_time = TimeCurrent();
+   
+   if(found) UpdateForensicDisplay();
+}
+
+//+------------------------------------------------------------------+
+//| Update the visual forensic display on chart                      |
+//+------------------------------------------------------------------+
+void UpdateForensicDisplay()
+{
+   string display = "=== HEDGE-ENGINE FORENSIC INTELLIGENCE ===\n";
+   display += StringFormat("Current Time: %s\n", TimeToString(TimeCurrent()));
+   display += "------------------------------------------\n";
+   display += StringFormat("L0 Session:   [%s]\n", g_forensic_layers[0]);
+   display += StringFormat("L1 HTF Bias:  [%s]\n", g_forensic_layers[1]);
+   display += StringFormat("L2 Zone Qual: [%s]\n", g_forensic_layers[2]);
+   display += StringFormat("L3 Liq Sweep: [%s]\n", g_forensic_layers[3]);
+   display += StringFormat("L4 mBOS Shift:[%s]\n", g_forensic_layers[4]);
+   display += StringFormat("L5 Displacem: [%s]\n", g_forensic_layers[5]);
+   display += "------------------------------------------\n";
+   display += StringFormat("ACTION: %s\n", g_forensic_action);
+   display += StringFormat("REASON: %s\n", g_forensic_reason);
+   display += "==========================================";
+   
+   Comment(display);
+}
 //+------------------------------------------------------------------+
