@@ -11,7 +11,7 @@
 //|   USER ACTION: Uncomment the line below to DISABLE DLL requirement 
 //|   (Required for Strategy Tester backtesting with CSV signals)
 //+------------------------------------------------------------------+
-#define DISABLE_ZMQ  // Comment this line ONLY for LIVE trading with ZMQ
+//#define DISABLE_ZMQ  // Comment this line ONLY for LIVE trading with ZMQ
 
 //+------------------------------------------------------------------+
 //| Log levels enum (Must be at the very top)                        |
@@ -129,7 +129,7 @@ input bool     ENABLE_VISUAL_REPLAY = false;    // Bypass time checks for visual
 
 // Logging
 input ENUM_LOG_LEVEL LOG_LEVEL = LOG_LEVEL_INFO;  // Log Level
-input bool     ENABLE_FILE_LOG = false;         // Enable File Logging
+input bool     ENABLE_FILE_LOG = true;          // Enable File Logging
 
 //+------------------------------------------------------------------+
 //| Global Variables                                                 |
@@ -282,6 +282,7 @@ void OnTimer()
 bool InitZMQ()
 {
 #ifndef DISABLE_ZMQ
+   Print("DEBUG: Starting InitZMQ...");
    // Create ZeroMQ context
    zmqContext = zmq_ctx_new();
    if(zmqContext == 0)
@@ -289,6 +290,7 @@ bool InitZMQ()
       LogError("Failed to create ZMQ context");
       return false;
    }
+   Print("DEBUG: Context Created: ", zmqContext);
    
    // Create subscriber socket
    zmqSubscriber = zmq_socket(zmqContext, ZMQ_SUB);
@@ -297,6 +299,7 @@ bool InitZMQ()
       LogError("Failed to create ZMQ subscriber socket");
       return false;
    }
+   Print("DEBUG: SUB Socket Created");
    
    // Set receive timeout to 0 (non-blocking)
    int timeout = 0;
@@ -312,11 +315,15 @@ bool InitZMQ()
    StringToCharArray(endpoint, endpointBytes);
    ArrayResize(endpointBytes, ArraySize(endpointBytes) - 1); // Remove null terminator
    
+   Print("DEBUG: Connecting SUB to ", endpoint);
    if(zmq_connect(zmqSubscriber, endpointBytes) != 0)
    {
       LogError(StringFormat("Failed to connect to %s", endpoint));
+      
+      // Get error number (zmq_errno is not imported, but return value is non-zero)
       return false;
    }
+   Print("DEBUG: SUB Connected OK");
    
    // Subscribe to topic
    uchar topicBytes[];
@@ -345,19 +352,19 @@ bool InitZMQ()
    StringToCharArray(hbEndpoint, hbBytes);
    ArrayResize(hbBytes, ArraySize(hbBytes)-1);
    
+   Print("DEBUG: Attempting to BIND Heartbeat to ", hbEndpoint);
    if(zmq_bind(zmqHeartbeat, hbBytes) != 0)
    {
       LogError(StringFormat("Failed to bind heartbeat to %s", hbEndpoint));
       return false;
    }
-   
-   LogInfo(StringFormat("Heartbeat server bound to %s", hbEndpoint));
+   Print("DEBUG: Heartbeat Bound Successfully");
    
    zmqConnected = true;
-   ArrayResize(signalQueue, MAX_QUEUE_SIZE);
+   LogInfo("ZeroMQ connection established successfully");
    return true;
 #else
-   return false;
+   return true;
 #endif
 }
 

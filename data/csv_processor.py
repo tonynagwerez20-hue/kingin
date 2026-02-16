@@ -142,23 +142,25 @@ class CSVBatchProcessor:
                         candle["min_delta"] = float(row[26])
                     except ValueError:
                         pass
-                elif len(row) >= 10:
-                    # Fallback for v4.0 default study chain
+                elif len(row) == 10:
+                    # Standard Sierra Export: 7=Trades, 8=BidVol, 9=AskVol
                     try:
-                        candle["delta"] = float(row[7])
-                        candle["max_delta"] = float(row[8])
-                        candle["min_delta"] = float(row[9])
+                        bid_vol = float(row[8])
+                        ask_vol = float(row[9])
+                        candle["delta"] = ask_vol - bid_vol
+                        # For historical data without per-tick peaks:
+                        candle["max_delta"] = candle["delta"]
+                        candle["min_delta"] = candle["delta"]
                     except ValueError:
                         pass
-                elif len(row) >= 19:
-                    # Legacy CVD (Delta) Parsing: Index 11=Bid Vol, 12=Ask Vol, 18=Direct Delta
-                    # Use direct delta from Sierra (index 18)
-                    candle["delta"] = float(row[18])
-                elif len(row) >= 13:
-                    # Fallback to calculated delta
-                    bid_vol = float(row[11])
-                    ask_vol = float(row[12])
-                    candle["delta"] = ask_vol - bid_vol
+                elif len(row) >= 11:
+                    # Legacy CVD (Delta) Parsing: Index 11=Bid Vol, 12=Ask Vol
+                    try:
+                        bid_vol = float(row[11])
+                        ask_vol = float(row[12])
+                        candle["delta"] = ask_vol - bid_vol
+                    except (ValueError, IndexError):
+                        pass
                 
                 # v3.9: Delta Simulation Fallback (runs if delta is still 0)
                 if candle["delta"] == 0 and candle["volume"] > 0:

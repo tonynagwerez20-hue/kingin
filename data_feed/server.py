@@ -56,6 +56,35 @@ mt5_latency_history = deque(maxlen=10)
 last_mt5_ping_time = 0
 
 
+# --- LOGGING SETUP ---
+class LoggerWriter:
+    def __init__(self, filepath):
+        self.terminal = sys.stdout
+        self.log = open(filepath, "a", encoding="utf-8")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+        # self.log.flush() # Flush is handled by flush() or explicitly if needed, but safe to let OS handle slightly buffering for perf, or force strict persistence.
+        self.log.flush()
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+    def isatty(self):
+        return True  # Cheat to satisfy libraries checking for TTY
+
+    def fileno(self):
+        return self.terminal.fileno()
+
+# Redirect stdout/stderr to file + console
+log_dir = project_root / "storage" / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+sys.stdout = LoggerWriter(log_dir / "server_live.log")
+sys.stderr = sys.stdout
+
+
 # Forward declaration of lifespan for FastAPI
 async def lifespan(app: FastAPI):
     # Determine Mode
@@ -124,42 +153,56 @@ async def lifespan(app: FastAPI):
         port_live = int(get_env("SIERRA_DTC_PORT", 11099))
         symbol = get_env("SIERRA_SYMBOL", "XAUUSD")
         
-        # v3.7 Hybrid Mode: Check if we should skip DTC History and use CSV instead
-        skip_history = get_env("DTC_SKIP_HISTORY", "False").lower() == "true"
+        # v4.0 HYBRID MODE: Always attempt to load history from CSV first
+        print("[Server] [HYBRID] Pre-loading History from CSV files...")
         
-        if skip_history:
-            print("[Server] [WARN] HYBRID MODE: Loading History from CSV, Live from DTC.")
-            # Reuse logic to load files into buffers
-            files_config = [
-                ("H1", get_env("SIERRA_H1_PATH", "data_feed/sierra_H1.txt")),
-                ("M15", get_env("SIERRA_M15_PATH", "data_feed/sierra_M15.txt")),
-                ("M5", get_env("SIERRA_M5_PATH", "data_feed/sierra_M5.txt"))
-            ]
-            loop = asyncio.get_running_loop()
-            
-            # One-shot load
-            for tf, path_str in files_config:
-                file_path = project_root / path_str
-                if file_path.exists():
-                    print(f"[Server] Pre-loading {tf} from {file_path}")
-                    # Reuse CSVBatchProcessor but just for initial load?
-                    # Or simpler: Just read lines 
-                    try: 
-                        # Hack: Create a temporary processor to read file once
-                        def noop_cb(c):
-                            if tf in ohlc_buffers: ohlc_buffers[tf].append(c)
-                            if tf in delta_buffers:
-                                delta_buffers[tf].append({
-                                    "delta": c.get("delta", 0.0),
-                                    "max": c.get("max_delta", c.get("delta", 0.0)),
-                                    "min": c.get("min_delta", c.get("delta", 0.0))
-                                })
+        files_config = [
+            ("H1", get_env("SIERRA_H1_PATH", "data_feed/sierra_H1.txt")),
+            ("M15", get_env("SIERRA_M15_PATH", "data_feed/sierra_M15.txt")),
+            ("M5", get_env("SIERRA_M5_PATH", "data_feed/sierra_M5.txt"))
+        ]
+        
+        loop = asyncio.get_running_loop()
+        
+        for tf, path_str in files_config:
+            file_path = project_root / path_str
+            # Try absolute if relative fails
+            if not file_path.exists() and Path(path_str).exists():
+                 file_path = Path(path_str)
 
-                        proc = CSVBatchProcessor(str(file_path), noop_cb)
-                        await loop.run_in_executor(None, proc.process_file_once) # Assume process_file_once exists or similar
-                        print(f"[Server] Loaded {len(ohlc_buffers.get(tf, []))} bars for {tf}")
-                    except Exception as e:
-                        print(f"[Server] Failed to load {tf}: {e}")
+            if file_path.exists():
+                print(f"[Server] Loading {tf} from {file_path}...")
+                try:
+                    # Define robust callback matching CSV mode
+                    def hybrid_cb(candle):
+                        # 1. Update OHLC
+                        if tf in ohlc_buffers:
+                             ohlc_buffers[tf].append(candle)
+                        
+                        # 2. Update Delta (Critical for Logic)
+                        if tf in delta_buffers:
+                             delta_buffers[tf].append({
+                                 "delta": candle.get("delta", 0.0),
+                                 "max": candle.get("max_delta", candle.get("delta", 0.0)),
+                                 "min": candle.get("min_delta", candle.get("delta", 0.0))
+                             })
+                        
+                        # 3. Update Latest Tick (if M5)
+                        if tf == "M5":
+                            # A bit hacky, but ensures dashboard isn't empty
+                            pass
+
+                    # Run Processor Once
+                    proc = CSVBatchProcessor(str(file_path), hybrid_cb)
+                    await loop.run_in_executor(None, proc.process_file_once)
+                    
+                    count = len(ohlc_buffers.get(tf, []))
+                    print(f"[Server]  -> Loaded {count} bars for {tf}")
+                    
+                except Exception as e:
+                    print(f"[Server]  -> Failed to load {tf}: {e}")
+            else:
+                print(f"[Server]  -> File not found: {file_path}")
         
         # v3.9 Multi-Symbol Support
         # Note: IGOF uses GC, ZN, 6E, ES. We should pass all if needed, or just the main symbol if disabled.
@@ -169,7 +212,7 @@ async def lifespan(app: FastAPI):
         # User wants "dormant", so let's just pass the single symbol to keep it lightweight?
         # No, "dormant" means code is there but not used. The client SHOULD have the capability.
         # Let's pass [symbol] to fix the error.
-        client = dtc_client.DTCClient(host=host, port_live=port_live, symbols=[symbol], skip_history=skip_history)
+        client = dtc_client.DTCClient(host=host, port_live=port_live, symbols=[symbol])
         global dtc_client_instance
         dtc_client_instance = client
         client.start()
@@ -393,6 +436,17 @@ async def get_latest_tick():
         })
     
     return JSONResponse(latest_tick)
+
+@app.get("/debug/buffers")
+async def debug_buffers():
+    """Diagnostic endpoint to inspect buffer counts."""
+    return JSONResponse({
+        "ohlc_keys": list(ohlc_buffers.keys()),
+        "ohlc_counts": {k: len(v) for k,v in ohlc_buffers.items()},
+        "delta_keys": list(delta_buffers.keys()),
+        "delta_counts": {k: len(v) for k,v in delta_buffers.items()},
+        "latest_tick": latest_tick
+    })
 
 @app.get("/status/detailed")
 async def get_detailed_status():

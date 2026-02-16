@@ -560,5 +560,5 @@ class DTCClient:
         self.is_downloading = True # Fix A: Block recycling until final record
         rid, interval = self.hist_queue[0] # v3.2: Peek instead of pop, robust to reconnects
         print(f"[DTC] Requesting History for {rid} ({interval}s). Waiting for data...")
-        req = dtc.HistoricalPriceDataRequest(rid, self.symbol, record_interval=interval)
+        req = dtc.HistoricalPriceDataRequest(rid, self.symbols[0], record_interval=interval)
         self._send_raw(req.pack_json(), False)
