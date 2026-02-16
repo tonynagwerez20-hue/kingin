@@ -2,12 +2,14 @@
 from .macro import MacroAuctionEngine
 from .correlation import CorrelationEngine
 from .liquidity import LiquidityEngine
+from .v1_engine import V1FiltrationEngine
 
 class FiltrationController:
     def __init__(self):
         self.macro = MacroAuctionEngine()
         self.correlation = CorrelationEngine()
         self.liquidity = LiquidityEngine()
+        self.v1 = V1FiltrationEngine()
         # Profile engine is internal to Macro for now? Or separate? 
         # Macro has Weekly Composite. We also need TPO?
         # For simplicity, Macro Engine handles Profile Checks (Location).
@@ -32,6 +34,18 @@ class FiltrationController:
         Input: market_snapshot (dict with price, vol, etc)
         Output: Signal (LONG/SHORT/NO_TRADE)
         """
+        # --- NEW V1 MULTI-LAYER FILTRATION ---
+        v1_snapshot = {
+            "h1_candles": market_snapshot.get("h1_candles", []),
+            "m5_candles": market_snapshot.get("m5_candles", []),
+            "active_zone": market_snapshot.get("active_zone") # Strategy manager should pass this
+        }
+        v1_result = self.v1.process_all_layers(v1_snapshot)
+        
+        if v1_result["action"] == "NO_TRADE":
+            return v1_result
+
+        # Legacy logic follows (optional confluence)
         price = market_snapshot.get("price")
         
         # 1. Macro Bias

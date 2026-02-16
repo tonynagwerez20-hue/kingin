@@ -145,7 +145,6 @@ async def lifespan(app: FastAPI):
                     # Reuse CSVBatchProcessor but just for initial load?
                     # Or simpler: Just read lines 
                     try: 
-                        from data.csv_processor import CSVBatchProcessor
                         # Hack: Create a temporary processor to read file once
                         def noop_cb(c):
                             if tf in ohlc_buffers: ohlc_buffers[tf].append(c)

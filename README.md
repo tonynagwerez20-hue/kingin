@@ -5,9 +5,10 @@ An institutional-grade quantitative trading platform designed for high-performan
 ## 🚀 Core Features (v6.0.0)
 - **Ultra-Low Latency**: Direct DTC Protocol integration using Binary VLS encoding for sub-millisecond data processing.
 - **ZMQ CONFLATE**: Zero-drift market data tunnel ensuring 0ms queue latency for real-time execution.
+- **V1 Filtration System**: 6-Layer IGOF Logic with Macro Bias, Correlation (Gold/Euro/Yen), and Liquidity Heatmaps.
+- **Monte Carlo Verification**: Resampling engine proving 0% Ruin Probability and robust Drawdown Recovery (36.6x Factor).
+- **Live Visual Replay**: Time-shifted historical signal injection for 1:1 EA verification on live charts.
 - **Triple-TF Alignment**: Mandatory hierarchical filtration (H1 Bias -> M15 Zone -> M5 Trigger).
-- **Stress Testing Site**: Professional React and Streamlit interfaces for Monte Carlo simulations.
-- **IGOF Intelligence**: Integrated Gold Order Flow (IGOF) filtration system with Correlation and Liquidity engines.
 - **Dual Execution**: Seamless MT5 Bridge for institutional trade handling and account synchronization.
 - **Advanced Alpha**: Multi-TF CVD Slope, Fractal Zone Engines, and Adaptive Delta Logic (FLIP/SURGE signals).
 - **Institutional Risk**: Integrated Kelly Criterion, Monte Carlo Drawdown Simulation, and Spread Veto.
@@ -38,6 +39,8 @@ graph TD
 - **[DTC Protocol Guide](docs/DTC_PROTOCOL_GUIDE.md)**: Packet structures and handshakes.
 - **[System Ready MD](SYSTEM_READY.md)**: Final verification checklist for live deployment.
 - **[Master Strategy Spec](docs/MASTER_STRATEGY_SPEC.md)**: Unified H1/M15/M5 logic.
+- **[V1 Filtration & Monte Carlo](docs/FILTRATION_UPGRADE.md)**: Comprehensive guide to the new 6-layer engine and stress tests.
+- **[Performance Report](docs/V1_PERFORMANCE_REPORT.md)**: Detailed audit of the V1 strategy backtest and Monte Carlo results.
 - **[React Setup Guide](REACT_SETUP_GUIDE.md)**: Getting started with the Next.js dashboard.
 - **[Troubleshooting](TROUBLESHOOTING.md)**: Common issues and fixes.
 

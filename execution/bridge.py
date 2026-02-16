@@ -77,6 +77,10 @@ class Bridge:
         if self.trading_symbol and signal.get("symbol") == "XAUUSD":
             signal["symbol"] = self.trading_symbol
             
+        # [Autofix] Inject timestamp if missing (Crucial for EA expiration check)
+        if "timestamp" not in signal:
+            signal["timestamp"] = int(time.time())
+            
         message = json.dumps(signal)
         self.pub_socket.send_string(f"SIGNAL {message}")
         print(f"[Bridge] Signal sent: {message}")

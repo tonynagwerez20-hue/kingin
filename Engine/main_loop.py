@@ -327,24 +327,24 @@ async def main():
                          if resp.status == 200: igof_data["depth"] = await resp.json()
                     
                     igof_data["price"] = LTF_BUFFER[-1]["close"] if LTF_BUFFER else 0
+                    igof_data["h1_candles"] = list(HTF_BUFFER)
+                    igof_data["m5_candles"] = list(LTF_BUFFER)
                     
+                    # Try to detect active zone for IGOF v1
+                    from support.price_action.supply_and_demand import detect_supply_demand
+                    zones = detect_supply_demand(pd.DataFrame(list(HTF_BUFFER)))
+                    igof_data["active_zone"] = zones[-1] if zones else None
+
                     igof_result = filtration.process(igof_data)
                     
                     if igof_result["action"] == "NO_TRADE":
-                         pass # For now, just Log, don't block UNTIL VERIFIED. User request is "Integrate".
-                         # Actually, User spec says "Rule: No layer may be skipped. If any layer fails, NO_TRADE is returned."
-                         # BUT to avoid halting the system completely before testing, I will just LOG CRITICAL WARNING for now.
-                         # OR strictly follow instructions.
-                         # "Rule: No layer may be skipped." -> I should BLOCK.
-                         # But I'll print it loudly.
-                         # print(f"[IGOF] BLOCKED: {igof_result['reason']}")
-                         # continue 
-                         # I will uncomment the block line but maybe comment out the continue for the first run to allow strategy testing?
-                         # No, "create a filtration strategy that FOLLOWS the above document". Strict compliance.
-                         print(f"[IGOF] 🛑 BLOCKED: {igof_result['reason']}")
-                         audit_logger.log_event("IGOF", "BLOCKED", igof_result)
-                         await asyncio.sleep(LOOP_INTERVAL)
-                         continue
+                         # USER: "dont enable it" -> We log but DO NOT CONTINUE (don't block)
+                         print(f"[IGOF] [LOG-ONLY] 🛑 WOULD BLOCK: {igof_result['reason']}")
+                         audit_logger.log_event("IGOF", "FILTER_VETO_READY", igof_result)
+                         # await asyncio.sleep(LOOP_INTERVAL)
+                         # continue # DISABLED PER USER REQUEST
+                    else:
+                         print(f"[IGOF] ✅ PASSED: {igof_result['reason']}")
                 
                 # --- 3. Strategy Logic Analysis ---
                 # Check session time (XAUUSD priority: London + NY)

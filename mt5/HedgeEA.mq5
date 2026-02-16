@@ -8,6 +8,12 @@
 #property strict
 
 //+------------------------------------------------------------------+
+//|   USER ACTION: Uncomment the line below to DISABLE DLL requirement 
+//|   (Required for Strategy Tester backtesting with CSV signals)
+//+------------------------------------------------------------------+
+#define DISABLE_ZMQ  // Comment this line ONLY for LIVE trading with ZMQ
+
+//+------------------------------------------------------------------+
 //| Log levels enum (Must be at the very top)                        |
 //+------------------------------------------------------------------+
 enum ENUM_LOG_LEVEL
@@ -23,18 +29,21 @@ enum ENUM_LOG_LEVEL
 //+------------------------------------------------------------------+
 struct SignalData
 {
-   string action;      // LONG, SHORT, CLOSE_LONG, CLOSE_SHORT, REVERSE_TO_LONG, REVERSE_TO_SHORT
-   string symbol;      // Trading symbol
-   double price;       // Signal price
-   double sl;          // Stop loss
-   double lots;        // Lot size
-   string bias;        // Market bias
-   long timestamp;     // Signal timestamp
+   string   id;            // Unique ID
+   string   action;        // LONG, SHORT, CLOSE_LONG, CLOSE_SHORT, REVERSE
+   string   symbol;        // Symbol (e.g. XAUUSD)
+   double   price;         // Signal Price
+   double   sl;            // Stop Loss
+   double   tp;            // Take Profit (NEW)
+   double   lots;          // Lot Size
+   string   bias;          // BIAS (BULLISH/BEARISH)
+   long     timestamp;     // Signal Timestamp
 };
 
 //+------------------------------------------------------------------+
 //| ZeroMQ DLL Imports (Direct)                                      |
 //+------------------------------------------------------------------+
+#ifndef DISABLE_ZMQ
 #import "libzmq.dll"
    long zmq_ctx_new();
    int zmq_ctx_destroy(long context);
@@ -46,6 +55,7 @@ struct SignalData
    int zmq_recv(long socket, uchar &buffer[], int length, int flags);
    int zmq_send(long socket, const uchar &buffer[], int length, int flags);
 #import
+#endif
 
 // ZMQ Constants
 #define ZMQ_SUB 2
@@ -114,6 +124,8 @@ input int      REVERSAL_DELAY_MS = 500;         // Delay between close and rever
 // Backtesting / Replay Mode
 input bool     BACKTEST_MODE = false;           // Enable Offline Signal Loading (CSV)
 input string   BACKTEST_FILE = "backtest_signals.csv"; // Signal file in MQL5/Files
+input int      SIGNAL_TIME_SHIFT = 0;           // Shift signal time in hours (e.g. +2, -5)
+input bool     ENABLE_VISUAL_REPLAY = false;    // Bypass time checks for visual backtesting
 
 // Logging
 input ENUM_LOG_LEVEL LOG_LEVEL = LOG_LEVEL_INFO;  // Log Level
@@ -128,6 +140,8 @@ long zmqSubscriber = 0;
 long zmqHeartbeat = 0;
 bool zmqConnected = false;
 
+// Operating State
+bool   IsBacktestActive = false;       // Auto-detected or forced via input
 // Signal Queue
 string signalQueue[];
 int queueHead = 0;
@@ -138,29 +152,56 @@ double dailyStartBalance = 0.0;
 datetime currentDay = 0;
 
 // Position tracking
-ulong currentPositionTicket = 0;
+ulong  currentPositionTicket = 0;
 string currentPositionDirection = "";  // "LONG" or "SHORT"
+long   lastProcessedLine = 0;          // Changed to long to avoid truncation warnings
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   Print("=== HedgeEA Initialization (Direct ZMQ v2.01) ===");
+   Print("=== HedgeEA Initialization (Direct ZMQ v2.03-TIMEPARSE) ===");
+   
+   // Set Timer (Every 1 second) for fallback signal checking
+   EventSetTimer(1);
    
    // Initialize daily tracking
    dailyStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
    currentDay = TimeCurrent();
    
-   // Initialize ZeroMQ
-   if(!InitZMQ())
+   // Auto-detect environment
+   IsBacktestActive = BACKTEST_MODE || (bool)MQLInfoInteger(MQL_TESTER);
+   
+   // Initialize ZeroMQ (Only if NOT in backtest mode)
+#ifndef DISABLE_ZMQ
+   if(!IsBacktestActive)
    {
-      Print("ERROR: Failed to initialize ZeroMQ connection");
+      if(!InitZMQ())
+      {
+         Print("ERROR: Failed to initialize ZeroMQ connection");
+         return(INIT_FAILED);
+      }
+      LogInfo(StringFormat("Listening on %s:%d for topic '%s'", ZMQ_HOST, ZMQ_PORT, ZMQ_TOPIC));
+   }
+   else
+   {
+      Print(">>> HedgeEA: BACKTEST MODE ACTIVE <<<");
+      Print(">>> Searching for signals in Common Folder: ", BACKTEST_FILE);
+   }
+#else
+   if(!IsBacktestActive)
+   {
+      Print("ERROR: ZMQ is disabled via macro. Cannot run live.");
       return(INIT_FAILED);
    }
+   else
+   {
+      Print(">>> HedgeEA: BACKTEST MODE ACTIVE (ZMQ Disabled) <<<");
+      Print(">>> Searching for signals in Common Folder: ", BACKTEST_FILE);
+   }
+#endif
    
-   LogInfo("HedgeEA initialized successfully");
-   LogInfo(StringFormat("Listening on %s:%d for topic '%s'", ZMQ_HOST, ZMQ_PORT, ZMQ_TOPIC));
    LogInfo(StringFormat("Risk Limits: MaxLots=%.2f, MaxPositions=%d, MaxDD=%.1f%%", 
            MAX_LOT_SIZE, MAX_OPEN_POSITIONS, MAX_DAILY_DRAWDOWN_PCT));
    
@@ -174,8 +215,12 @@ void OnDeinit(const int reason)
 {
    LogInfo("HedgeEA shutting down...");
    
-   // Cleanup ZeroMQ
-   if(zmqConnected)
+   // Kill timer
+   EventKillTimer();
+   
+   // Cleanup ZeroMQ (Only if it was connected)
+#ifndef DISABLE_ZMQ
+   if(zmqConnected && !IsBacktestActive)
    {
       if(zmqSubscriber != 0)
          zmq_close(zmqSubscriber);
@@ -183,7 +228,10 @@ void OnDeinit(const int reason)
          zmq_close(zmqHeartbeat);
       if(zmqContext != 0)
          zmq_ctx_destroy(zmqContext);
+      
+      zmqConnected = false;
    }
+#endif
    
    Print("=== HedgeEA Deinitialized ===");
 }
@@ -201,7 +249,7 @@ void OnTick()
       UpdateTrailingStops();
    
    // Check for new signals
-   if(BACKTEST_MODE)
+   if(IsBacktestActive)
       CheckForOfflineSignals();
    else
       CheckForSignals();
@@ -210,8 +258,22 @@ void OnTick()
    ProcessSignalQueue();
    
    // Respond to heartbeats (skip in backtest)
-   if(!BACKTEST_MODE)
+#ifndef DISABLE_ZMQ
+   if(!IsBacktestActive)
       CheckHeartbeat();
+#endif
+}
+
+//+------------------------------------------------------------------+
+//| Timer function for fallback processing                           |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   if(IsBacktestActive)
+   {
+      CheckForOfflineSignals();
+      ProcessSignalQueue();
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -219,6 +281,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool InitZMQ()
 {
+#ifndef DISABLE_ZMQ
    // Create ZeroMQ context
    zmqContext = zmq_ctx_new();
    if(zmqContext == 0)
@@ -293,6 +356,9 @@ bool InitZMQ()
    zmqConnected = true;
    ArrayResize(signalQueue, MAX_QUEUE_SIZE);
    return true;
+#else
+   return false;
+#endif
 }
 
 //+------------------------------------------------------------------+
@@ -300,6 +366,7 @@ bool InitZMQ()
 //+------------------------------------------------------------------+
 void CheckForSignals()
 {
+#ifndef DISABLE_ZMQ
    if(!zmqConnected)
       return;
    
@@ -333,6 +400,7 @@ void CheckForSignals()
          }
       }
    }
+#endif
 }
 
 //+------------------------------------------------------------------+
@@ -340,6 +408,7 @@ void CheckForSignals()
 //+------------------------------------------------------------------+
 void CheckHeartbeat()
 {
+#ifndef DISABLE_ZMQ
    if(!zmqConnected || zmqHeartbeat == 0) return;
    
    uchar hbBuf[4096];  // Increased buffer for JSON messages
@@ -391,19 +460,19 @@ void CheckHeartbeat()
                if(OrderSend(request, result) && result.retcode == TRADE_RETCODE_DONE)
                {
                   // Success - send acknowledgment
-                  string ack = StringFormat("{\"status\":\"SUCCESS\",\"ticket\":%d,\"execution_price\":%.5f,\"timestamp\":\"%s\"}",
+                  string ack = StringFormat("{\"status\":\"SUCCESS\",\"ticket\":%I64u,\"execution_price\":%.5f,\"timestamp\":\"%s\"}",
                                           result.order, result.price, TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS));
                   uchar ackBytes[];
                   StringToCharArray(ack, ackBytes);
                   ArrayResize(ackBytes, ArraySize(ackBytes) - 1);
                   zmq_send(zmqHeartbeat, ackBytes, ArraySize(ackBytes), 0);
                   
-                  LogInfo(StringFormat("Signal executed with ack: Ticket %d", result.order));
+                  LogInfo(StringFormat("Signal executed with ack: Ticket %I64u", result.order));
                }
                else
                {
                   // Failure - send error
-                  string ack = StringFormat("{\"status\":\"FAILED\",\"error\":\"%s\",\"retcode\":%d}",
+                  string ack = StringFormat("{\"status\":\"FAILED\",\"error\":\"%s\",\"retcode\":%u}",
                                           result.comment, result.retcode);
                   uchar ackBytes[];
                   StringToCharArray(ack, ackBytes);
@@ -478,6 +547,7 @@ void CheckHeartbeat()
          zmq_send(zmqHeartbeat, ackBytes, ArraySize(ackBytes), 0);
       }
    }
+#endif
 }
 
 //+------------------------------------------------------------------+
@@ -498,53 +568,59 @@ void ProcessSignalQueue()
 //+------------------------------------------------------------------+
 //| Process received signal                                          |
 //+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| Process received signal                                          |
+//+------------------------------------------------------------------+
 void ProcessSignal(string jsonSignal)
 {
-   LogInfo(StringFormat("Processing signal: %s", jsonSignal));
+   LogInfo(StringFormat(">>> Pipeline [1/4]: Starting ProcessSignal for: %s", jsonSignal));
    
    // Parse JSON signal
    SignalData signal;
    if(!ParseSignal(jsonSignal, signal))
    {
-      LogError("Failed to parse signal JSON");
+      LogError("!!! Pipeline [FAIL]: Failed to parse signal JSON structure");
       return;
    }
    
    // Handle different signal types
    if(signal.action == "LONG" || signal.action == "SHORT")
    {
+      LogInfo(StringFormat(">>> Pipeline [2/4]: Validating %s signal for %s", signal.action, signal.symbol));
+      
       // Entry signal - validate and execute
       if(!ValidateSignal(signal))
       {
-         LogWarning("Signal validation failed");
+         LogWarning("!!! Pipeline [FAIL]: Signal validation rejected the trade");
          return;
       }
       
+      LogInfo(">>> Pipeline [3/4]: Checking Risk Management limits...");
       if(!CheckRiskLimits(signal))
       {
-         LogWarning("Signal rejected due to risk limits");
+         LogWarning("!!! Pipeline [FAIL]: Signal rejected by RiskManager");
          return;
       }
       
+      LogInfo(">>> Pipeline [4/4]: Routing to ExecuteTrade...");
       ExecuteTrade(signal);
    }
    else if(signal.action == "CLOSE_LONG" || signal.action == "CLOSE_SHORT")
    {
-      // Exit signal - close position
+      LogInfo(StringFormat(">>> Pipeline [EXIT]: Processing %s for %s", signal.action, signal.symbol));
       ClosePosition(signal);
    }
    else if(signal.action == "REVERSE_TO_LONG" || signal.action == "REVERSE_TO_SHORT")
    {
-      // Reversal signal - close existing, then open new
+      LogInfo(StringFormat(">>> Pipeline [REVERSE]: Reversing to %s", signal.action));
       ClosePosition(signal);
-      Sleep(REVERSAL_DELAY_MS);  // Brief delay
+      Sleep(REVERSAL_DELAY_MS);
       
-      // Convert reversal action to entry action
       signal.action = (signal.action == "REVERSE_TO_LONG") ? "LONG" : "SHORT";
       
       if(!ValidateSignal(signal))
       {
-         LogWarning("Reversal signal validation failed");
+         LogWarning("!!! Pipeline [FAIL]: Reversal validation failed");
          return;
       }
       
@@ -552,7 +628,7 @@ void ProcessSignal(string jsonSignal)
    }
    else
    {
-      LogWarning(StringFormat("Unknown signal action: %s", signal.action));
+      LogWarning(StringFormat("!!! Pipeline [FAIL]: Unknown action code: %s", signal.action));
    }
 }
 
@@ -562,18 +638,21 @@ void ProcessSignal(string jsonSignal)
 //+------------------------------------------------------------------+
 bool ParseSignal(string json, SignalData &signal)
 {
-   // Simple JSON parsing (in production, use a proper JSON library)
-   // Expected format: {"action":"LONG","symbol":"XAUUSD","price":2045.50,"sl":2043.50,"lots":0.05}
-   
    signal.action = ExtractStringValue(json, "action");
    signal.symbol = ExtractStringValue(json, "symbol");
    signal.price = ExtractDoubleValue(json, "price");
    signal.sl = ExtractDoubleValue(json, "sl");
+   signal.tp = ExtractDoubleValue(json, "tp");
    signal.lots = ExtractDoubleValue(json, "lots");
    signal.bias = ExtractStringValue(json, "bias");
-   signal.timestamp = (long)ExtractDoubleValue(json, "timestamp");
+   if(signal.bias == "") signal.bias = ExtractStringValue(json, "desc"); // Fallback to desc
+   signal.timestamp = (long)NormalizeDouble(ExtractDoubleValue(json, "timestamp"), 0);
    
-   return (signal.action != "" && signal.symbol != "" && signal.price > 0);
+   bool success = (signal.action != "" && signal.symbol != "" && signal.price > 0);
+   if(success) {
+      LogDebug(StringFormat("   [PARSE] Action: %s, Symbol: %s, Price: %.2f, SL: %.2f", signal.action, signal.symbol, signal.price, signal.sl));
+   }
+   return success;
 }
 
 //+------------------------------------------------------------------+
@@ -582,43 +661,59 @@ bool ParseSignal(string json, SignalData &signal)
 bool ValidateSignal(SignalData &signal)
 {
    // Check action
-   if(signal.action != "LONG" && signal.action != "SHORT")
+   if(signal.action != "LONG" && signal.action != "SHORT" && 
+      signal.action != "CLOSE_LONG" && signal.action != "CLOSE_SHORT" &&
+      signal.action != "REVERSE_TO_LONG" && signal.action != "REVERSE_TO_SHORT")
    {
-      LogError(StringFormat("Invalid action: %s", signal.action));
+      Print("   [VALIDATE/FAIL] Invalid action: ", signal.action);
       return false;
    }
    
-   // Check symbol
-   if(signal.symbol != _Symbol)
+   // Symbol mapping safety: If signal says XAUUSD and chart is XAUUSD.m, we allow it
+   string sigSym = signal.symbol;
+   string chartSym = _Symbol;
+   StringToUpper(sigSym);
+   StringToUpper(chartSym);
+   
+   bool symMatch = (StringFind(sigSym, chartSym) != -1 || StringFind(chartSym, sigSym) != -1 || sigSym == chartSym);
+   
+   if(!symMatch)
    {
-      LogWarning(StringFormat("Signal for different symbol: %s (current: %s)", signal.symbol, _Symbol));
+      Print(StringFormat("   [VALIDATE/FAIL] Symbol mismatch. Signal:%s vs Chart:%s", sigSym, chartSym));
       return false;
    }
    
+   // Refresh signal symbol to match broker chart name exactly (crucial for SymbolInfo calls)
+   signal.symbol = _Symbol;
+
    // Check if symbol is tradable
-   if(!SymbolInfoInteger(signal.symbol, SYMBOL_TRADE_MODE))
+   if(!SymbolInfoInteger(_Symbol, SYMBOL_TRADE_MODE))
    {
-      LogError(StringFormat("Symbol %s is not tradable", signal.symbol));
+      Print("   [VALIDATE/FAIL] Symbol ", _Symbol, " is not tradable (SYMB_TRADE_MODE)");
       return false;
    }
    
-   // Check lot size (only for entry signals)
-   double minLot = SymbolInfoDouble(signal.symbol, SYMBOL_VOLUME_MIN);
-   double maxLot = SymbolInfoDouble(signal.symbol, SYMBOL_VOLUME_MAX);
+   // Skip Lot/SL checks for exit signals
+   if(signal.action == "CLOSE_LONG" || signal.action == "CLOSE_SHORT") return true;
+
+   // Check lot size
+   double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
    
    if(signal.lots < minLot || signal.lots > maxLot)
    {
-      LogError(StringFormat("Invalid lot size: %.2f (min: %.2f, max: %.2f)", signal.lots, minLot, maxLot));
+      Print(StringFormat("   [VALIDATE/FAIL] Lot size error: %.2f (min: %.2f, max: %.2f)", signal.lots, minLot, maxLot));
       return false;
    }
    
-   // Check stop loss (only for entry signals)
+   // Check stop loss
    if(signal.sl <= 0)
    {
-      LogError("Invalid stop loss");
+      Print("   [VALIDATE/FAIL] Invalid stop loss (<= 0)");
       return false;
    }
    
+   LogDebug("   [VALIDATE/PASS] Signal data is valid");
    return true;
 }
 
@@ -630,7 +725,7 @@ bool CheckRiskLimits(SignalData &signal)
    // Check max lot size
    if(signal.lots > MAX_LOT_SIZE)
    {
-      LogWarning(StringFormat("Lot size %.2f exceeds maximum %.2f", signal.lots, MAX_LOT_SIZE));
+      LogWarning(StringFormat("   [RISK/FAIL] Lot size %.2f exceeds maximum limit %.2f", signal.lots, MAX_LOT_SIZE));
       return false;
    }
    
@@ -638,7 +733,7 @@ bool CheckRiskLimits(SignalData &signal)
    int openPositions = CountOpenPositions();
    if(openPositions >= MAX_OPEN_POSITIONS)
    {
-      LogWarning(StringFormat("Max open positions reached: %d", openPositions));
+      LogWarning(StringFormat("   [RISK/FAIL] Max open positions reached (%d/%d)", openPositions, MAX_OPEN_POSITIONS));
       return false;
    }
    
@@ -648,10 +743,11 @@ bool CheckRiskLimits(SignalData &signal)
    
    if(dailyPnL < -maxLoss)
    {
-      LogWarning(StringFormat("Daily drawdown limit reached: %.2f (max: %.2f)", dailyPnL, -maxLoss));
+      LogWarning(StringFormat("   [RISK/FAIL] Daily drawdown reached: %.2f (limit: %.2f)", dailyPnL, -maxLoss));
       return false;
    }
    
+   LogDebug("   [RISK/PASS] All risk checks passed");
    return true;
 }
 
@@ -665,38 +761,47 @@ void ExecuteTrade(SignalData &signal)
    ZeroMemory(request);
    ZeroMemory(result);
    
+   double ask = SymbolInfoDouble(signal.symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(signal.symbol, SYMBOL_BID);
+   
+   if(ask <= 0 || bid <= 0) {
+      LogError(StringFormat("   [EXECUTE/FAIL] Could not get price for %s (Ask:%.2f, Bid:%.2f)", signal.symbol, ask, bid));
+      return;
+   }
+
    // Prepare trade request
    request.action = TRADE_ACTION_DEAL;
    request.symbol = signal.symbol;
-   request.volume = NormalizeLots(signal.lots);
+   request.volume = signal.lots;
    request.type = (signal.action == "LONG") ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-   request.price = (signal.action == "LONG") ? SymbolInfoDouble(signal.symbol, SYMBOL_ASK) : SymbolInfoDouble(signal.symbol, SYMBOL_BID);
+   request.price = (signal.action == "LONG") ? ask : bid;
    request.sl = signal.sl;
-   request.tp = 0;  // No TP - dynamic exits only
+   request.tp = 0.0;           
    request.deviation = SLIPPAGE_POINTS;
    request.magic = MAGIC_NUMBER;
-   request.comment = TRADE_COMMENT;
-   request.type_filling = ORDER_FILLING_IOC;
+   request.comment = StringFormat("%s", TRADE_COMMENT);
+   request.type_filling = ORDER_FILLING_FOK;
+   
+   LogInfo(StringFormat("   [EXECUTE/SEND] Request: %s %s %.2f lots @ %.5f (Ask:%.5f, Bid:%.5f)", 
+                        (request.type == ORDER_TYPE_BUY ? "BUY" : "SELL"), request.symbol, request.volume, request.price, ask, bid));
    
    // Send order
    if(!OrderSend(request, result))
    {
-      LogError(StringFormat("OrderSend failed: %d - %s", GetLastError(), result.comment));
+      LogError(StringFormat("   [ORDER_SEND/ERROR] Critical system error: %d - %s", GetLastError(), result.comment));
       return;
    }
    
    if(result.retcode == TRADE_RETCODE_DONE)
    {
-      // Track position
       currentPositionTicket = result.order;
       currentPositionDirection = signal.action;
       
-      LogInfo(StringFormat("Trade executed: %s %.2f lots at %.5f, SL: %.5f, Ticket: %d",
-              signal.action, request.volume, result.price, request.sl, result.order));
+      LogInfo(StringFormat("   [SUCCESS] Trade executed! Ticket: %I64u, Fill Price: %.5f", result.order, result.price));
    }
    else
    {
-      LogError(StringFormat("Trade failed: %d - %s", result.retcode, result.comment));
+      LogError(StringFormat("   [EXECUTE/REJECTED] MT5 code: %u, Comment: %s", result.retcode, result.comment));
    }
 }
 
@@ -743,7 +848,7 @@ void ClosePosition(SignalData &signal)
             {
                if(result.retcode == TRADE_RETCODE_DONE)
                {
-                  LogInfo(StringFormat("Position closed: Ticket %d at %.5f", ticket, result.price));
+                  LogInfo(StringFormat("Position closed: Ticket %I64u at %.5f", ticket, result.price));
                   positionClosed = true;
                   
                   // Clear position tracking
@@ -752,7 +857,7 @@ void ClosePosition(SignalData &signal)
                }
                else
                {
-                  LogError(StringFormat("Close failed: %d - %s", result.retcode, result.comment));
+                  LogError(StringFormat("Close failed: %u - %s", (uint)result.retcode, result.comment));
                }
             }
             else
@@ -775,13 +880,23 @@ void ClosePosition(SignalData &signal)
 //+------------------------------------------------------------------+
 void UpdateTrailingStops()
 {
+   if(!ENABLE_TRAILING_SL) return;
+
    double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
    int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
    
-   // Convert pips to price
-   double trailingStop = TRAILING_STOP_PIPS * point * 10;  // For 5-digit brokers
+   // Convert pips to price units
+   // Standard: 1 pip = 10 points for most 5/3/2 digit brokers
+   double trailingStop = TRAILING_STOP_PIPS * point * 10;
    double trailingStep = TRAILING_STEP_PIPS * point * 10;
    
+   static datetime lastLog = 0;
+   if(PositionsTotal() > 0 && TimeCurrent() - lastLog > 3600) {
+      LogDebug(StringFormat("Trailing check active for %d positions. Stop: %.5f, Step: %.5f", 
+               PositionsTotal(), trailingStop, trailingStep));
+      lastLog = TimeCurrent();
+   }
+
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       ulong ticket = PositionGetTicket(i);
@@ -811,14 +926,12 @@ void UpdateTrailingStops()
          // For LONG positions: trail stop below current price
          newSL = NormalizeDouble(currentPrice - trailingStop, digits);
          
-         // Only update if:
-         // 1. New SL is higher than current SL (or no SL set)
-         // 2. Price has moved enough (trailing step)
-         if(newSL > currentSL + trailingStep || currentSL == 0)
+         // Update if:
+         // 1. No SL set
+         // 2. New SL is higher than existing SL by at least one 'step'
+         if(currentSL == 0 || newSL > currentSL + trailingStep)
          {
-            // Don't move SL above entry (keep it profitable)
-            if(newSL < openPrice)
-               shouldUpdate = true;
+            shouldUpdate = true;
          }
       }
       else if(posType == POSITION_TYPE_SELL)
@@ -826,14 +939,12 @@ void UpdateTrailingStops()
          // For SHORT positions: trail stop above current price
          newSL = NormalizeDouble(currentPrice + trailingStop, digits);
          
-         // Only update if:
-         // 1. New SL is lower than current SL (or no SL set)
-         // 2. Price has moved enough (trailing step)
-         if(newSL < currentSL - trailingStep || currentSL == 0)
+         // Update if:
+         // 1. No SL set
+         // 2. New SL is lower than existing SL by at least one 'step'
+         if(currentSL == 0 || newSL < currentSL - trailingStep)
          {
-            // Don't move SL below entry (keep it profitable)
-            if(newSL > openPrice)
-               shouldUpdate = true;
+            shouldUpdate = true;
          }
       }
       
@@ -851,16 +962,23 @@ void UpdateTrailingStops()
          request.sl = newSL;
          request.tp = PositionGetDouble(POSITION_TP);  // Keep existing TP
          
+         LogInfo(StringFormat(">>> Trailing SL Update: Ticket %I64u | NewSL: %.5f | PreviousSL: %.5f | Price: %.5f", 
+                             ticket, newSL, currentSL, currentPrice));
+
          if(OrderSend(request, result))
          {
             if(result.retcode == TRADE_RETCODE_DONE)
             {
-               LogDebug(StringFormat("Trailing SL updated: Ticket %d, New SL: %.5f", ticket, newSL));
+               LogInfo(StringFormat("   [SUCCESS] Trailing SL moved for ticket %I64u", ticket));
             }
             else
             {
-               LogDebug(StringFormat("Trailing SL update failed: %d - %s", result.retcode, result.comment));
+               LogError(StringFormat("   [REJECTED] Trailing SL: %u - %s", result.retcode, result.comment));
             }
+         }
+         else
+         {
+            LogError(StringFormat("   [ERROR] OrderSend failed for Trailing SL: %d", GetLastError()));
          }
       }
    }
@@ -878,7 +996,7 @@ int CountOpenPositions()
       ulong ticket = PositionGetTicket(i);
       if(PositionSelectByTicket(ticket))
       {
-         if(PositionGetInteger(POSITION_MAGIC) == MAGIC_NUMBER)
+         if((int)PositionGetInteger(POSITION_MAGIC) == MAGIC_NUMBER)
             count++;
       }
    }
@@ -900,7 +1018,7 @@ double GetDailyPnL()
       ulong ticket = HistoryDealGetTicket(i);
       if(ticket > 0)
       {
-         if(HistoryDealGetInteger(ticket, DEAL_MAGIC) == MAGIC_NUMBER)
+         if((int)HistoryDealGetInteger(ticket, DEAL_MAGIC) == MAGIC_NUMBER)
          {
             pnl += HistoryDealGetDouble(ticket, DEAL_PROFIT);
          }
@@ -913,7 +1031,7 @@ double GetDailyPnL()
       ulong ticket = PositionGetTicket(i);
       if(PositionSelectByTicket(ticket))
       {
-         if(PositionGetInteger(POSITION_MAGIC) == MAGIC_NUMBER)
+         if((int)PositionGetInteger(POSITION_MAGIC) == MAGIC_NUMBER)
             pnl += PositionGetDouble(POSITION_PROFIT);
       }
    }
@@ -1031,6 +1149,7 @@ void LogError(string message)
 //+------------------------------------------------------------------+
 //| ZMQ Wrapper for integer options                                  |
 //+------------------------------------------------------------------+
+#ifndef DISABLE_ZMQ
 int ZmqSetSockOpt(long socket, int option, int value)
 {
    uchar bytes[4];
@@ -1040,14 +1159,17 @@ int ZmqSetSockOpt(long socket, int option, int value)
    bytes[3] = (uchar)((value >> 24) & 0xFF);
    return zmq_setsockopt(socket, option, bytes, 4);
 }
+#endif
 
 //+------------------------------------------------------------------+
 //| ZMQ Wrapper for byte array options                               |
 //+------------------------------------------------------------------+
+#ifndef DISABLE_ZMQ
 int ZmqSetSockOpt(long socket, int option, const uchar &value[])
 {
    return zmq_setsockopt(socket, option, value, ArraySize(value));
 }
+#endif
 
 //+------------------------------------------------------------------+
 //|   Get Open Positions as JSON                                     |
@@ -1065,12 +1187,12 @@ string GetOpenPositionsJson()
             ulong ticket = PositionGetTicket(i);
             if(PositionSelectByTicket(ticket))
             {
-                  if(PositionGetInteger(POSITION_MAGIC) == MAGIC_NUMBER)
+                  if((int)PositionGetInteger(POSITION_MAGIC) == MAGIC_NUMBER)
                   {
                         if(!first) json += ",";
                         
-                        long type = PositionGetInteger(POSITION_TYPE);
-                        string typeStr = (type == POSITION_TYPE_BUY) ? "LONG" : "SHORT";
+                        int type = (int)PositionGetInteger(POSITION_TYPE);
+                        string typeStr = (type == (int)POSITION_TYPE_BUY) ? "LONG" : "SHORT";
                         
                         string posJson = "{" + 
                               "\"ticket\":" + (string)ticket + "," +
@@ -1116,7 +1238,7 @@ string GetHistoryDealsJson(int days)
                         if(!first) json += ",";
                         
                         long type = HistoryDealGetInteger(ticket, DEAL_TYPE);
-                        string typeStr = (type == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                        string typeStr = ((int)type == (int)DEAL_TYPE_BUY) ? "BUY" : "SELL";
                         
                         string dealJson = "{" +
                               "\"ticket\":" + (string)ticket + "," +
@@ -1141,54 +1263,144 @@ string GetHistoryDealsJson(int days)
 //+------------------------------------------------------------------+
 //| Check for signals in a local CSV file (Backtest/Replay Mode)     |
 //+------------------------------------------------------------------+
-int lastProcessedLine = 0;
-
 void CheckForOfflineSignals()
 {
-   int fileHandle = FileOpen(BACKTEST_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
+   // Rate limit: Only check once per second
+   static datetime lastCheckTime = 0;
+   if(TimeCurrent() == lastCheckTime) return;
+   lastCheckTime = TimeCurrent();
+
+   // Reset counter if file is empty or smaller (user cleared it)
+   static long lastFileSize = 0;
+   
+   // Try Common Folder first
+   int fileHandle = FileOpen(BACKTEST_FILE, FILE_READ|FILE_CSV|FILE_ANSI|FILE_COMMON, ',');
+   bool isCommon = true;
+   
    if(fileHandle == INVALID_HANDLE)
    {
-      static bool warned = false;
-      if(!warned) { LogWarning("Offline signal file not found: " + BACKTEST_FILE); warned = true; }
+      // Try local folder if common fails
+      fileHandle = FileOpen(BACKTEST_FILE, FILE_READ|FILE_CSV|FILE_ANSI, ',');
+      isCommon = false;
+   }
+   
+   if(fileHandle == INVALID_HANDLE)
+   {
+      static datetime lastWarn = 0;
+      if(TimeCurrent() - lastWarn > 3600) { 
+         Print("ERROR: Backtest signal file NOT FOUND in Common or Local folder: ", BACKTEST_FILE); 
+         lastWarn = TimeCurrent();
+      }
       return;
    }
 
-   int currentLine = 0;
+   // Check if file was reset or updated
+   long fileSize = FileSize(fileHandle);
+   if(fileSize < lastFileSize) {
+      Print("Signal file reset detected. Resetting line counter.");
+      lastProcessedLine = 0;
+   }
+   lastFileSize = fileSize;
+
+   long currentLine = 0;
+   int newSignals = 0;
+   
    while(!FileIsEnding(fileHandle))
    {
-      string line = FileReadString(fileHandle);
-      if(line == "") continue;
+      // 1. Read first token (Timestamp)
+      string lineToken = FileReadString(fileHandle);
+      StringTrimLeft(lineToken);
+      StringTrimRight(lineToken);
       
-      currentLine++;
+      // Handle empty tokens/newlines
+      if(lineToken == "") {
+         if(FileIsEnding(fileHandle)) break;
+         continue;
+      }
       
-      // Skip headers and already processed lines
-      if(currentLine <= 1 || currentLine <= lastProcessedLine)
+      // SAFETY: If the token doesn't look like a date (e.g. 2026-01-14), skip it
+      // This prevents "ghost tokens" like lone newlines from shifting the columns
+      if(StringLen(lineToken) < 10 || (StringFind(lineToken, "-") == -1 && StringFind(lineToken, ".") == -1))
       {
-         // Skip remaining columns in this line
-         while(!FileIsLineEnding(fileHandle)) FileReadString(fileHandle);
+         // Consume rest of line and skip
+         while(!FileIsLineEnding(fileHandle) && !FileIsEnding(fileHandle)) FileReadString(fileHandle);
          continue;
       }
 
-      // Parse columns: Time, Symbol, Action, Price, SL, Lots, Desc, MagicNumber
-      string sTime = line;
-      string sSymbol = FileReadString(fileHandle);
-      string sAction = FileReadString(fileHandle);
-      double dPrice = StringToDouble(FileReadString(fileHandle));
-      double dSL = StringToDouble(FileReadString(fileHandle));
-      double dLots = StringToDouble(FileReadString(fileHandle));
-      string sDesc = FileReadString(fileHandle);
-      long nMagic = (long)StringToInteger(FileReadString(fileHandle));
+      currentLine++;
+      
+      // Skip headers (Line 1) and already processed lines
+      if(currentLine <= 1 || currentLine <= lastProcessedLine)
+      {
+         while(!FileIsLineEnding(fileHandle) && !FileIsEnding(fileHandle)) FileReadString(fileHandle);
+         continue;
+      }
 
-      // Quick JSON-like wrap to reuse existing ProcessSignal logic
-      string pseudoJson = StringFormat("{\"action\":\"%s\",\"symbol\":\"%s\",\"price\":%.5f,\"sl\":%.5f,\"lots\":%.2f,\"desc\":\"%s\",\"magic\":%d}",
-                                       sAction, sSymbol, dPrice, dSL, dLots, sDesc, nMagic);
+      // Column 1: Time
+      string rawTime = lineToken;
+      StringReplace(rawTime, "-", ".");
+      datetime signalTime = StringToTime(rawTime);
+      signalTime = signalTime + (SIGNAL_TIME_SHIFT * 3600);
       
-      LogInfo("Offline Signal Detected: " + sAction);
+      // Column 2: Symbol
+      string sSymbol = FileReadString(fileHandle);
+      
+      // Column 3: Action
+      string sAction = FileReadString(fileHandle);
+      
+      // Column 4-7: Price, SL, TP, Lots
+      double dPrice = StringToDouble(FileReadString(fileHandle));
+      double dSL    = StringToDouble(FileReadString(fileHandle));
+      double dTP    = StringToDouble(FileReadString(fileHandle));
+      double dLots  = StringToDouble(FileReadString(fileHandle));
+      
+      // Column 8-9: Description, Magic
+      string sDesc  = FileReadString(fileHandle);
+      string sMagic = FileReadString(fileHandle);
+
+      // Clean up strings
+      StringTrimLeft(sSymbol); StringTrimRight(sSymbol);
+      StringTrimLeft(sAction); StringTrimRight(sAction);
+      
+      // TEMPORAL FILTERING:
+      datetime currentTime = TimeCurrent();
+      
+      // 1. Future signal: WAIT
+      if(!ENABLE_VISUAL_REPLAY && signalTime > currentTime)
+      {
+         static datetime lastWaitLog = 0;
+         if(TimeCurrent() - lastWaitLog >= 60) 
+         {
+             Print(StringFormat("Waiting for signal time: %s (Current: %s)", TimeToString(signalTime), TimeToString(currentTime)));
+             lastWaitLog = TimeCurrent();
+         }
+         FileClose(fileHandle);
+         return; 
+      }
+      
+      // 2. Old signal: SKIP (Unless in Visual Replay Mode)
+      if(!ENABLE_VISUAL_REPLAY && signalTime < currentTime - 3600)
+      {
+         Print(StringFormat("SKIPPING EXPIRED SIGNAL: %s (Current: %s) -> Diff: %d sec", 
+               TimeToString(signalTime), TimeToString(currentTime), (int)(currentTime - signalTime)));
+         lastProcessedLine = currentLine;
+         continue;
+      }
+      
+      // 3. EXECUTE
+      LogInfo(StringFormat(">>> Pipeline [0/4]: Found signal at Line %I64d | Time: %s", currentLine, TimeToString(signalTime)));
+      
+      // Build JSON with fixed mapping
+      string pseudoJson = StringFormat("{\"action\":\"%s\",\"symbol\":\"%s\",\"price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"lots\":%.2f,\"desc\":\"%s\",\"timestamp\":%I64d}",
+                                       sAction, sSymbol, dPrice, dSL, dTP, dLots, sDesc, (long)signalTime);
+      
       ProcessSignal(pseudoJson);
-      
+      newSignals++;
       lastProcessedLine = currentLine;
    }
+
    
+   if(newSignals > 0) Print("Processed ", newSignals, " new signals from file.");
    FileClose(fileHandle);
 }
 
