@@ -5,11 +5,11 @@ from .liquidity import LiquidityEngine
 from .v1_engine import V1FiltrationEngine
 
 class FiltrationController:
-    def __init__(self):
+    def __init__(self, v1_engine: Optional[V1FiltrationEngine] = None):
         self.macro = MacroAuctionEngine()
         self.correlation = CorrelationEngine()
         self.liquidity = LiquidityEngine()
-        self.v1 = V1FiltrationEngine()
+        self.v1 = v1_engine or V1FiltrationEngine()
         # Profile engine is internal to Macro for now? Or separate? 
         # Macro has Weekly Composite. We also need TPO?
         # For simplicity, Macro Engine handles Profile Checks (Location).

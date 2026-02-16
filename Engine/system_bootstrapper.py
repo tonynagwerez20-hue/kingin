@@ -129,12 +129,13 @@ class SystemBootstrapper:
         from support.risk.cro_rules import CRORules
         from support.risk.regime_layer import RegimeLayer
         from support.risk.broker_watchdog import BrokerWatchdog
-        from support.audit_logger import AuditLogger
+        from support.risk.audit_logger import AuditLogger
         from support.strategies.manager import StrategyManager
         from support.strategies.filter_one import FilterOne
         from support.strategies.filter_two import FilterTwo
         from support.strategies.candlestick_trigger import CandlestickStrategy
         from Engine.igof.stack import FiltrationController
+        from Engine.igof.v1_engine import V1FiltrationEngine
         
         # Initialize Position Tracker
         self.position_tracker = PositionTracker()
@@ -146,7 +147,7 @@ class SystemBootstrapper:
         self.broker_watchdog = BrokerWatchdog()
         self.audit_logger = AuditLogger()
         
-        # Initialize Modular Strategies
+        # Initialize Modular Strategies (Plug-and-Play)
         alpha_strategies = [
             CandlestickStrategy(),
             FilterOne(),
@@ -154,7 +155,12 @@ class SystemBootstrapper:
         ]
         self.strategy_manager = StrategyManager(alpha_strategies)
         
-        # Initialize IGOF Controller
+        # Initialize Modular IGOF Layers (Plug-and-Play)
+        # Note: V1FiltrationEngine uses default layers from config/trading_params.json 
+        # if none are provided. This is where you can inject custom layers.
+        # Example: custom_layers = [MyCustomLayer(), ...]
+        # self.filtration = FiltrationController(v1_engine=V1FiltrationEngine(layers=custom_layers))
+        
         self.filtration = FiltrationController()
         
         print("[OK] [Pre-Flight] 5-layer Risk Defense & Modular Alpha and IGOF initialized.")
