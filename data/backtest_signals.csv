@@ -262,3 +262,4 @@ Time,Symbol,Action,Price,SL,TP,Lots,Description,Magic
 2026-02-13 18:20:00,XAUUSD,LONG,4971.34,4966.34,0.0,0.1,V1-Pass | Bias:2 | All Layers Passed,654321
 2026-02-13 19:15:00,XAUUSD,LONG,4962.46,4957.46,0.0,0.1,V1-Pass | Bias:2 | All Layers Passed,654321
 2026-02-13 19:30:00,XAUUSD,LONG,4993.70,4988.70,0.0,0.1,V1-Pass | Bias:2 | All Layers Passed,654321
+2026-02-16 12:21:22,XAUUSD,CLOSE_SHORT,5002.56,,,TRIPLE EXIT: Opposite Zone Reached (FilterTwo: Price in Demand Zone),123456
