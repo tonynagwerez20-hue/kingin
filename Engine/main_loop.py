@@ -101,9 +101,34 @@ except ImportError as e:
     print(f"Import Error: {e}")
 
 
-async def main():
-    check_dependencies()
+# --- LOGGING SETUP ---
+class LoggerWriter:
+    def __init__(self, filepath):
+        self.terminal = sys.stdout
+        self.log = open(filepath, "a", encoding="utf-8")
 
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        return self.log.fileno()
+
+# Redirect stdout/stderr to file + console
+log_dir = project_root / "storage" / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+sys.stdout = LoggerWriter(log_dir / "engine_live.log")
+sys.stderr = sys.stdout
+
+
+async def main():
     # Parse CLI Arguments
     parser = argparse.ArgumentParser(description="Hedge Gold Trading Engine")
     parser.add_argument("--backtest", action="store_true", help="Run in Backtest/Replay mode (records signals to CSV, skips MT5 execution)")
@@ -116,377 +141,54 @@ async def main():
         print("!!! Signals will be recorded to data/backtest_signals.csv !!!")
         print("!"*60 + "\n")
 
-    # ========== PRE-FLIGHT CHECKS ==========
-    print("\n" + "="*60)
-    print("PRE-FLIGHT SYSTEM VALIDATION")
-    print("="*60 + "\n")
+    # ========== SYSTEM BOOTSTRAP ==========
+    from Engine.system_bootstrapper import SystemBootstrapper
     
-    # Initialize Bridge
-    bridge = None
-    try:
-        print(f"[Pre-Flight] Testing MT5 Bridge connection... (Backtest: {backtest_mode})")
-        if backtest_mode:
-            # Use alternative ports to avoid conflict with running system
-            bridge = Bridge(pub_port=5565, req_port=5567)
-        else:
-            bridge = Bridge(pub_port=5555, req_port=5557)
-        
-        if not backtest_mode:
-            if not bridge.connected:
-                print("\n[ERROR] [CRITICAL] MT5 Bridge NOT CONNECTED")
-                print("   Possible causes:")
-                print("   1. MetaTrader 5 is not running")
-                print("   2. Algo Trading is disabled (must be GREEN)")
-                print("   3. EA is not attached to chart")
-                print("   4. DLL imports not allowed in MT5 settings")
-                print("\n   Fix: Run diagnostic script first:")
-                print("   python tests/diag_system_health.py\n")
-                sys.exit(1)
-            
-            # Test heartbeat
-            heartbeat = bridge.check_connection()
-            if not heartbeat:
-                print("\n[ERROR] [CRITICAL] MT5 Bridge heartbeat FAILED")
-                print("   EA is not responding. Check MT5 'Experts' tab for errors.")
-                print("   Ensure EA shows smiley face (not sad face)\n")
-                sys.exit(1)
-            
-            print("[OK] [Pre-Flight] MT5 Bridge: CONNECTED")
-        else:
-            print("[OK] [Pre-Flight] MT5 Bridge: OFFLINE (Backtest Mode Active)")
-        
-    except Exception as e:
-        print(f"\n[X] [CRITICAL] MT5 Bridge initialization failed: {e}")
-        print("   Run diagnostic script: python tests/diag_system_health.py\n")
-        sys.exit(1)
+    bootstrapper = SystemBootstrapper(project_root, backtest_mode)
+    components = await bootstrapper.run_preflight(API_URL, DEFAULT_ACCOUNT_BALANCE)
     
-    # Initialize Position Tracker
-    position_tracker = PositionTracker()
+    # Extract components
+    bridge = components["bridge"]
+    position_tracker = components["position_tracker"]
+    risk_manager = components["risk_manager"]
+    cro_rules = components["cro_rules"]
+    regime_layer = components["regime_layer"]
+    broker_watchdog = components["broker_watchdog"]
+    audit_logger = components["audit_logger"]
+    strategy_manager = components["strategy_manager"]
+    filtration = components["filtration"]
+    account_balance = components["account_balance"]
+    db = components["db"]
     
-    # Initialize Risk Defense
-    risk_manager = RiskManager()
-    cro_rules = CRORules()
-    regime_layer = RegimeLayer()
-    broker_watchdog = BrokerWatchdog()
-    audit_logger = AuditLogger()
-    
-    # Initialize Modular Strategies
-    from support.strategies.candlestick_trigger import CandlestickStrategy
-    alpha_strategies = [
-        CandlestickStrategy(),
-        FilterOne(),
-        FilterTwo()
-    ]
-    strategy_manager = StrategyManager(alpha_strategies)
-    
-    # Initialize IGOF Controller
-    filtration = FiltrationController()
-    
-    print(f"[OK] [Pre-Flight] 5-layer Risk Defense & Modular Alpha and IGOF initialized.")
-    
-    # Fetch initial account balance from MT5
-    account_balance = DEFAULT_ACCOUNT_BALANCE
     last_balance_check = 0
     
-    # Instance of database for state persistence
-    db = position_tracker.db if position_tracker else None
+    # ========== MAIN TRADING LOOP ==========
+    from Engine.trading_loop_controller import TradingLoopController
     
-    if bridge and bridge.connected:
-        print("[Pre-Flight] Fetching MT5 account balance...")
-        fetched_balance = bridge.get_account_balance()
-        if fetched_balance is not None:
-            account_balance = fetched_balance
-            print(f"[OK] [Pre-Flight] MT5 account balance: ${account_balance:,.2f}")
-            if db:
-                db.set_state("account_balance", account_balance)
-                db.set_state("balance_last_sync", time.time())
-        else:
-            print(f"[WARN] [Pre-Flight] MT5 balance fetch timeout, using default: ${account_balance:.2f}")
-    else:
-        print(f"[WARN] [Pre-Flight] MT5 not connected, using default balance: ${account_balance:.2f}")
-
-    # Wait for buffers to populate before starting signal generation
-    print("[Main] Waiting for DTC to populate buffers...")
-    warmup_start = time.time()
-    warmup_timeout = 180  # v3.2 hardening: Increased to 180s for robust multi-TF sync
+    # Initialize trading loop controller with all dependencies
+    trading_loop = TradingLoopController(
+        api_url=API_URL,
+        bridge=bridge,
+        position_tracker=position_tracker,
+        risk_manager=risk_manager,
+        cro_rules=cro_rules,
+        regime_layer=regime_layer,
+        broker_watchdog=broker_watchdog,
+        audit_logger=audit_logger,
+        strategy_manager=strategy_manager,
+        filtration=filtration,
+        db=db,
+        backtest_mode=backtest_mode
+    )
     
-    async with aiohttp.ClientSession() as session:
-        while time.time() - warmup_start < warmup_timeout:
-            try:
-                # 0. Check DTC Sync Status
-                async with session.get(f"{API_URL}/status") as status_resp:
-                    if status_resp.status == 200:
-                        status_data = await status_resp.json()
-                        if status_data.get("mode") == "DTC" and not status_data.get("is_synced"):
-                            print(f"[Main] DTC History Syncing... {status_data.get('pending_count')} TFs left.")
-                            await asyncio.sleep(2)
-                            continue
-
-                # 1. Check buffer status
-                async with session.get(f"{API_URL}/ohlc?tf=H1&limit=1") as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        candle_data = data.get("candles", [])
-                        h1_count = len(candle_data) if candle_data else 0
-                
-                async with session.get(f"{API_URL}/ohlc?tf=M15&limit=1") as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        candle_data = data.get("candles", [])
-                        m15_count = len(candle_data) if candle_data else 0
-                
-                async with session.get(f"{API_URL}/ohlc?tf=M5&limit=1") as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        candle_data = data.get("candles", [])
-                        m5_count = len(candle_data) if candle_data else 0
-                
-                # Check if minimum data is available (H1 can be less than 500 initially)
-                if h1_count > 0 and m15_count > 0 and m5_count > 0:
-                    print(f"[Main] [OK] DTC Synced & Buffers Ready.")
-                    break
-                else:
-                    print(f"[Main] Waiting for bars... H1={h1_count} M15={m15_count} M5={m5_count}")
-                    await asyncio.sleep(2)
-            except Exception as e:
-                print(f"[Main] Waiting for data feed server: {e}")
-                await asyncio.sleep(2)
-        else:
-            # v3.4: Strict Startup Guard - Do not proceed with partial data
-            print(f"[Main] [WARN] WARNING: Warmup timed out after {warmup_timeout}s")
-            print("[Main] [CRITICAL] [ALERT] Startup Aborted: DTC History Sync Incomplete.")
-            print("[Main] [ACTION] Check Sierra Chart Connection or 'Recycle' logic.")
-            sys.exit(1)
+    # Set initial account balance
+    trading_loop.account_balance = account_balance
+    trading_loop.loop_interval = LOOP_INTERVAL
+    trading_loop.balance_refresh_interval = BALANCE_REFRESH_INTERVAL
     
-    async with aiohttp.ClientSession() as session:
-        while True:
-            try:
-                # 1. Fetch Data Batches (H1, M15, M5)
-                # ... (Fetching code remains same, just ensuring context) ...
-                
-                # Fetch H1
-                async with session.get(f"{API_URL}/ohlc?tf=H1&limit=50") as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        h1_candles = data.get("candles", [])
-                        dispatch_batch(h1_candles, HTF_BUFFER)
+    # Run the trading loop
+    await trading_loop.run()
 
-                # Fetch M15
-                async with session.get(f"{API_URL}/ohlc?tf=M15&limit=50") as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        m15_candles = data.get("candles", [])
-                        dispatch_batch(m15_candles, MTF_BUFFER)
-
-                # Fetch M5
-                async with session.get(f"{API_URL}/ohlc?tf=M5&limit=50") as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        m5_candles = data.get("candles", [])
-                        dispatch_batch(m5_candles, LTF_BUFFER)
-
-                # Fetch Delta (M5) - Keep at 500 for strategy logic
-                delta_struct = None
-                async with session.get(f"{API_URL}/delta?tf=M5&limit=500") as resp:
-                    if resp.status == 200:
-                        delta_struct = await resp.json()
-                
-                # --- 2. Risk Layer Verification ---
-                # A. Detect Regime
-                regime = regime_layer.detect_regime(list(LTF_BUFFER))
-                risk_manager.update_regime(regime)
-                
-                # B. Check Execution Veto - ENFORCE IT!
-                if not risk_manager.check_execution_allowed():
-                    print("[Risk] GLOBAL VETO ACTIVE - Skipping signal generation")
-                    audit_logger.log_event("RISK", "GLOBAL_VETO", {"regime": regime})
-                    await asyncio.sleep(LOOP_INTERVAL)
-                    audit_logger.log_event("RISK", "GLOBAL_VETO", {"regime": regime})
-                    await asyncio.sleep(LOOP_INTERVAL)
-                    continue  # Skip this iteration entirely
-                
-                # --- 2.5 IGOF Filtration (Context & Orderflow) ---
-                if ENABLE_IGOF:
-                    # Update Macro/Profile State with latest M5 batch
-                    if LTF_BUFFER:
-                        filtration.update_batch(list(LTF_BUFFER))
-
-                    # Fetch Correlation Data (M15)
-                    igof_data = {}
-                    async with session.get(f"{API_URL}/ohlc?tf=M15&symbol=GC&limit=50") as resp:
-                         if resp.status == 200: igof_data["gc_m15"] = (await resp.json()).get("candles", [])
-                    async with session.get(f"{API_URL}/ohlc?tf=M15&symbol=ZN&limit=50") as resp:
-                         if resp.status == 200: igof_data["zn_m15"] = (await resp.json()).get("candles", [])
-                    async with session.get(f"{API_URL}/ohlc?tf=M15&symbol=6E&limit=50") as resp:
-                         if resp.status == 200: igof_data["6e_m15"] = (await resp.json()).get("candles", [])
-                    async with session.get(f"{API_URL}/ohlc?tf=M15&symbol=ES&limit=50") as resp:
-                         if resp.status == 200: igof_data["es_m15"] = (await resp.json()).get("candles", [])
-                    
-                    # Fetch Depth
-                    async with session.get(f"{API_URL}/depth?symbol=GC") as resp:
-                         if resp.status == 200: igof_data["depth"] = await resp.json()
-                    
-                    igof_data["price"] = LTF_BUFFER[-1]["close"] if LTF_BUFFER else 0
-                    igof_data["h1_candles"] = list(HTF_BUFFER)
-                    igof_data["m5_candles"] = list(LTF_BUFFER)
-                    
-                    # Try to detect active zone for IGOF v1
-                    from support.price_action.supply_and_demand import detect_supply_demand
-                    zones = detect_supply_demand(pd.DataFrame(list(HTF_BUFFER)))
-                    igof_data["active_zone"] = zones[-1] if zones else None
-
-                    igof_result = filtration.process(igof_data)
-                    
-                    if igof_result["action"] == "NO_TRADE":
-                         # USER: "dont enable it" -> We log but DO NOT CONTINUE (don't block)
-                         print(f"[IGOF] [LOG-ONLY] 🛑 WOULD BLOCK: {igof_result['reason']}")
-                         audit_logger.log_event("IGOF", "FILTER_VETO_READY", igof_result)
-                         # await asyncio.sleep(LOOP_INTERVAL)
-                         # continue # DISABLED PER USER REQUEST
-                    else:
-                         print(f"[IGOF] ✅ PASSED: {igof_result['reason']}")
-                
-                # --- 3. Strategy Logic Analysis ---
-                # Check session time (XAUUSD priority: London + NY)
-                # UTC Time based
-                from datetime import datetime, timezone
-                now_utc = datetime.now(timezone.utc)
-                hour_utc = now_utc.hour
-                
-                # Trading Window: 08:00 to 21:00 UTC (London Open through NY Close)
-                is_trade_session = 8 <= hour_utc < 21
-                
-                # Periodic balance and trade refresh (every 60 seconds)
-                current_time = time.time()
-                if bridge and bridge.connected and (current_time - last_balance_check) > BALANCE_REFRESH_INTERVAL:
-                    # 1. Sync Balance
-                    fetched_balance = bridge.get_account_balance()
-                    if fetched_balance is not None:
-                        account_balance = fetched_balance
-                        print(f"[Main] Balance updated: ${account_balance:.2f}")
-                        if db:
-                            db.set_state("account_balance", account_balance)
-                            db.set_state("balance_last_sync", time.time())
-                    
-                    # 2. Sync Trades (Open and History)
-                    if db:
-                        try:
-                            # A. Sync Open Positions
-                            open_positions = bridge.get_open_positions()
-                            for pos in open_positions:
-                                pos["status"] = "open"
-                                db.upsert_trade(pos)
-                            
-                            # B. Sync Recent History
-                            closed_history = bridge.get_trade_history(days=2)
-                            for trade in closed_history:
-                                trade["status"] = "closed"
-                                db.upsert_trade(trade)
-                                
-                            print(f"[Main] Synced {len(open_positions)} open and {len(closed_history)} closed trades from MT5.")
-                            if len(open_positions) == 0 and len(closed_history) == 0:
-                                # Provide hint if sync is silent or failing
-                                pass
-                        except Exception as sync_err:
-                            print(f"[Main] Trade sync error: {sync_err}")
-
-                    last_balance_check = current_time
-                
-                # Strategy manager handles confluence and reversals internally.
-                signal_evt = strategy_manager.aggregate_signals(
-                    htf_buffer=list(HTF_BUFFER),
-                    mtf_buffer=list(MTF_BUFFER),
-                    ltf_buffer=list(LTF_BUFFER),
-                    delta_struct=delta_struct,
-                    position_tracker=position_tracker,
-                    account_balance=account_balance,  # Use dynamic balance
-                    verbose_logs=True  # Enable detailed logging to diagnose filter failures
-                )
-                
-                if signal_evt:
-                    audit_logger.log_event("STRATEGY", "SIGNAL_GENERATED", {"signal": signal_evt})
-                
-                # Filter for session (Exits always allowed)
-                if signal_evt and "CLOSE" not in signal_evt["action"] and not is_trade_session:
-                    print(f"[Session] Entry BLOCKED: Non-trading session (UTC {hour_utc})")
-                    signal_evt = None
-                
-                # --- 4. Microstructure Audit (Pre-Execution) ---
-                if signal_evt and "CLOSE" not in signal_evt["action"]:
-                    # Fetch REAL spread from data feed
-                    spread = 1.5  # Default fallback
-                    try:
-                        async with session.get(f"{API_URL}/spread") as resp:
-                            if resp.status == 200:
-                                spread_data = await resp.json()
-                                spread = spread_data.get("spread", 1.5)
-                    except Exception as e:
-                        print(f"[Warning] Could not fetch spread: {e}")
-                    
-                    market_state = {
-                        "spread": spread,
-                        "volume": LTF_BUFFER[-1]["volume"] if LTF_BUFFER else 1.0
-                    }
-                    audit_res = cro_rules.audit_trade_request(signal_evt, market_state)
-                    
-                    if audit_res["status"] == "FAIL":
-                        audit_logger.log_event("CRO", "RISK_VETO", {"signal": signal_evt, "reason": audit_res["reason"]})
-                        print(f"[Risk] VETO: {audit_res['reason']}")
-                        signal_evt = None # Block entry
-                    else:
-                        audit_logger.log_event("CRO", "PASS", {"signal": signal_evt})
-                
-                if signal_evt:
-                    action = signal_evt.get("action")
-                    price = signal_evt.get("price")
-                    sl = signal_evt.get("sl")
-                    lots = signal_evt.get("lots")
-                    desc = signal_evt.get("desc")
-                    symbol = signal_evt.get("symbol", "XAUUSD")
-                    
-                    print(f"[SIGNAL] {action} | {desc} | Price: {price} | Lots: {lots}")
-                    
-                    # Dispatch to Bridge
-                    if bridge:
-                        bridge.send_signal(signal_evt, record_only=backtest_mode)
-                        
-                    # Update Internal Position Tracker
-                    if "CLOSE" in action:
-                         position_tracker.close_position(price)
-                         alert_manager.send_email(f"Trade EXIT: {action}", desc)
-                         
-                    elif "REVERSE" in action:
-                        position_tracker.close_position(price)
-                        new_dir = "LONG" if "LONG" in action else "SHORT"
-                        position_tracker.open_position(new_dir, symbol, price, lots, sl)
-                        alert_manager.send_email(f"Trade REVERSAL: {action}", desc)
-                        
-                    elif action in ["LONG", "SHORT"]:
-                        position_tracker.open_position(action, symbol, price, lots, sl)
-                        alert_manager.send_email(f"Trade ENTRY: {action}", desc)
-
-                # Heartbeat / Status
-                if not signal_evt and int(time.time()) % 10 == 0:
-                     # Basic status printing
-                     pass
-
-
-            
-            except asyncio.CancelledError:
-                print("[Main] Shutdown signal received.")
-                break
-            except Exception as e:
-                print(f"[Main] Loop Error: {e}")
-                import traceback
-                traceback.print_exc()
-                # Exponential backoff on persistent errors
-                await asyncio.sleep(min(LOOP_INTERVAL * 5, 30))
-
-            # Periodic memory cleanup (low-spec optimization)
-            if ENABLE_CLEANUP and int(time.time()) % 300 == 0:
-                gc.collect()
-                
-            await asyncio.sleep(LOOP_INTERVAL)
 
 if __name__ == "__main__":
     try:

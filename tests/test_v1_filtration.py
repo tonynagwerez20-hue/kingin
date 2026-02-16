@@ -43,7 +43,7 @@ class TestV1Filtration(unittest.TestCase):
             "active_zone": {"type": "demand", "index": 5, "mitigated": False, "volume_spike": True}
         }
         # Inject custom methods to test flow
-        self.engine.calculate_h1_bias = lambda x: 3
+        self.engine.calculate_h1_bias = lambda x, t=None: 3
         self.engine.score_zone = lambda x, y: 5
         self.engine.check_liquidity_event = lambda x: True
         self.engine.check_microstructure_shift = lambda x: True
