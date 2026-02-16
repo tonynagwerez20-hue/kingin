@@ -116,3 +116,37 @@ To avoid this error in the future:
 ---
 
 **The dashboard should now be running successfully at http://localhost:3000!**
+
+---
+
+## MetaTrader 5 & ZMQ Bridge Issues
+
+### 1. EA Not Receiving Signals
+**Symptoms**: Python says "Signal Sent", but EA does absolutely nothing (no logs in Experts tab).
+
+**Fix**:
+1.  **Check `BACKTEST_MODE`**:
+    - If running Live/ZMQ, ensure `BACKTEST_MODE` is `false`.
+    - If reading CSV, ensure `BACKTEST_MODE` is `true`.
+2.  **Check Port 5555**:
+    - Run `netstat -ano | findstr :5555`.
+    - If nothing shows, the EA is NOT listening. Re-init the EA on the chart.
+3.  **Check DLLs**:
+    - Go to `Tools -> Options -> Expert Advisors`.
+    - Ensure "Allow DLL imports" is checked.
+
+### 2. EA "Skipping" Historical Signals
+**Symptoms**: EA says "SKIPPING EXPIRED SIGNAL" in the logs during a Visual Replay.
+
+**Fix**:
+- You missed the new parameter.
+- Go to EA Inputs and set `ENABLE_VISUAL_REPLAY` = `true`.
+- This tells the EA to ignore the timestamp check.
+
+### 3. "Address in use" (ZMQ Error)
+**Symptoms**: Python crashes with `ZMQError: Address in use`.
+
+**Fix**:
+- You have a zombie Python process or another script running.
+- Run `taskkill /IM python.exe /F` to kill all Python scripts.
+- Restart `main_loop.py`.

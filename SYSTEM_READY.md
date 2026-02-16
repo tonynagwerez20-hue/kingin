@@ -35,7 +35,8 @@ Based on our complete review, here's your final status:
 ✅ Execution: MetaTrader 5 via ZMQ Bridge
 ✅ Primary UI: React (Next.js) Professional Dashboard
 ✅ Analysis UI: Streamlit Real-time Dashboard
-✅ Strategy: Triple-TF (H1/M15/M5) Hierarchical Alignment logic
+✅ Strategy: V1 IGOF (6-Layer) Filtration System
+✅ Risk: Monte Carlo Verified (0% Ruin, 36x Recovery)
 ```
 
 ---
@@ -48,6 +49,7 @@ Based on our complete review, here's your final status:
 - [ ] **Optional**: Run as Administrator (fixes NTP error, but not required)
 - [ ] DTC Protocol Server enabled
 - [ ] Listening on port 11099
+- [ ] **Critical**: Symbols DXY, US10Y, SPX500 added to active chartbook (for IGOF)
 - [ ] Connected to data feed (green "Conn" status)
 - [ ] **Note**: Trading enabled in Sierra Chart is NOT required (you're using MT5)
 

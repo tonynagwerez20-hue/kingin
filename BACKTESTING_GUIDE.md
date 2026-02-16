@@ -41,7 +41,24 @@ This mode uses local text files (`data_feed/sierra_*.txt`) to simulate data.
     python run_backtest.py --mode=CSV
     ```
 
-## Outputs
-- **Console**: Real-time log of strategy logic.
-- **Signals**: Saved to `data/backtest_signals.csv`.
-- **Logs**: Detailed logs in `engine_backtest.log` (if configured).
+## Option 3: Time-Shifted Visual Replay (MT5)
+To visualize historical signals on a live MT5 chart (bypassing the 1-hour expiration):
+
+1.  **Generate Signals**: Run `python RUN_MONTE_CARLO.bat` or your signal generator to create `data/backtest_signals.csv`.
+2.  **Copy File**: Move `data/backtest_signals.csv` to `%AppData%\MetaQuotes\Terminal\Common\Files`.
+3.  **Configure EA**:
+    *   `BACKTEST_MODE` = `true`
+    *   `ENABLE_VISUAL_REPLAY` = `true` (Crucial!)
+4.  **Run**: The EA will plot trades on the chart, ignoring time discrepancies.
+
+## Option 4: ZMQ Signal Injection (Live Test)
+To test the Python-to-EA communication pipeline without waiting for live market signals:
+
+1.  **Configure EA**:
+    *   `BACKTEST_MODE` = `false` (Live Mode)
+    *   Ensure ZMQ Server is running (Port 5555).
+2.  **Run Injector**:
+    ```bash
+    python Engine/replay_signals_to_ea.py
+    ```
+3.  **Result**: The script reads `backtest_signals.csv` and pushes signals via ZMQ. The EA receives them as "Live" signals (with injected current timestamps) and executes them.

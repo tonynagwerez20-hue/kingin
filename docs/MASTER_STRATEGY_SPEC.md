@@ -3,23 +3,20 @@
 ## 1. Core Architecture: Triple-TF Hierarchical Alignment
 The system follows a strict "H1 Bias -> M15 Context -> M5 Execution" protocol. No layer may be skipped.
 
-### A. Filter One: HTF Structural Bias (H1)
-- **Timeframe**: H1 (1-Hour)
-- **Function**: Determines the primary directional bias for the day.
-- **Logic**: Uses market structure (Break of Structure/EMA) to define BULLISH or BEARISH regime.
-- **Rule**: Trades are only permitted in the direction of the H1 bias.
+### A. V1 Filtration System (IGOF Upgrade)
+The core logic has been upgraded to a 6-layer Integrated Gold Order Flow (IGOF) engine:
+1.  **Macro Auction**: Weekly/Daily Profile location relative to Value Area (VA) and POC.
+2.  **Liquidity Heatmap**: Rejection of trades into low-liquidity zones.
+3.  **Correlation (Inter-market)**: Real-time alignment with DXY (Inverse), US10Y (Inverse), and SPX (Correlated).
+4.  **H1 Structural Bias**: Market Structure Shift (MSS) and EMA Cloud trend definition.
+5.  **M15 Zone Context**: Supply/Demand zone validation.
+6.  **M5 Trigger**: Orderflow Delta Surge + Candlestick Pattern confirmation.
 
-### B. Filter Two: MTF Strategic Context (M15)
-- **Timeframe**: M15 (15-Minute)
-- **Function**: Identifies high-probability Supply and Demand zones.
-- **Logic**: Automatically detects and mitigates zones based on price action.
-- **Rule**: Price must be inside a validated M15 zone to authorize an entry.
-
-### C. Trigger Layer: LTF Execution (M5)
+### B. Trigger Layer: LTF Execution (M5)
 - **Timeframe**: M5 (5-Minute)
 - **Function**: Precision entry and risk management.
 - **Logic**: Uses Candlestick Patterns and Orderflow Delta.
-- **Rule**: Entry signal must align with H1 and M15 direction.
+- **Rule**: Entry signal must pass ALL 6 IGOF layers.
 
 ## 2. Technical Optimization: ZMQ Pipeline
 To maintain sub-second execution speeds, the system utilizes an optimized ZeroMQ tunnel.
