@@ -1,0 +1,98 @@
+{
+    "trading": {
+        "symbol": "XAUUSD",
+        "pip_value": 0.01,
+        "pip_size": 0.01,
+        "default_account_balance": 10,
+        "master_switch": true
+    },
+    "performance": {
+        "lite_mode": false,
+        "enable_cli_dashboard": false,
+        "enable_streamlit_dashboard": false,
+        "loop_delay_seconds": 3.0,
+        "buffer_max_length": 100,
+        "heartbeat_interval_seconds": 15
+    },
+    "pipeline": {
+        "active_data_source": "MT5_PROVIDER",
+        "data_provider": {
+            "class_path": "Engine.mt5_provider.MT5DataProvider",
+            "config": {
+                "login": 105771322,
+                "password": "4e_mOpDu",
+                "server": "FBS-Demo"
+            }
+        },
+        "filtration_layers": [
+            {
+                "class_path": "Engine.igof.layers.smc_layers.KillzoneFilterLayer",
+                "config": {
+                    "timeframe_key": "m5_candles",
+                    "utc_offset": 3
+                }
+            },
+            {
+                "class_path": "Engine.igof.layers.smc_layers.MechanicalStructureLayer",
+                "config": {
+                    "timeframe_key": "h1_candles"
+                }
+            },
+            {
+                "class_path": "Engine.igof.layers.smc_layers.LiquiditySweepLayer",
+                "config": {
+                    "timeframe_key": "m15_candles"
+                }
+            },
+            {
+                "class_path": "Engine.igof.layers.smc_layers.DisplacementLayer",
+                "config": {
+                    "threshold": 1.5,
+                    "timeframe_key": "m1_candles"
+                }
+            },
+            {
+                "class_path": "Engine.igof.layers.smc_layers.FVGDiscountLayer",
+                "config": {
+                    "timeframe_key": "m15_candles"
+                }
+            },
+            {
+                "class_path": "Engine.igof.layers.smc_layers.MicroMSSLayer",
+                "config": {
+                    "timeframe_key": "m1_candles"
+                }
+            }
+        ],
+        "strategies": [
+            {
+                "class_path": "support.strategies.smc_strategy.SMCStrategy",
+                "config": {
+                    "layers": [
+                        "MechanicalStructure",
+                        "LiquiditySweep",
+                        "FVGDiscount",
+                        "Displacement",
+                        "MicroMSS",
+                        "KillzoneFilter"
+                    ],
+                    "min_total_score": 3.0,
+                    "min_layers_passed": 3,
+                    "default_lots": 0.01,
+                    "sl_pips": 50
+                }
+            }
+        ],
+        "risk_rules": [
+            {
+                "class_path": "support.risk.ultra_low_risk.UltraLowAccountRiskRule",
+                "config": {
+                    "min_equity_threshold": 7.5,
+                    "max_daily_loss_pct": 5.0,
+                    "max_concurrent_positions": 1,
+                    "enforced_lot_size": 0.01
+                }
+            }
+        ]
+    }
+}
