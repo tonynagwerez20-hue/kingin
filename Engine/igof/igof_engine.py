@@ -25,6 +25,8 @@ class IGOFEngine:
         Returns NO_TRADE if any layer fails.
         """
         results = []
+        passed_layers = []
+        failed_layers = []
         
         # Helper: ensure current_time is available for layers that need it
         if "current_time" not in market_snapshot and "m5_candles" in market_snapshot:
@@ -34,31 +36,53 @@ class IGOFEngine:
         for layer in self.layers:
             try:
                 res = layer.process(market_snapshot)
-                results.append({
-                    "layer": layer.__class__.__name__,
-                    "result": res
-                })
+                layer_name = layer.__class__.__name__
+                status = res.get("status", False)
+                reason = res.get("reason", "")
+                score = res.get("score", 0.0)
                 
-                if not res.get("status", False):
-                    logger.info(f"Trade filtered by {layer.__class__.__name__}: {res.get('reason', 'Filtered')}")
+                layer_result = {
+                    "layer": layer_name,
+                    "result": res
+                }
+                results.append(layer_result)
+                
+                if status:
+                    passed_layers.append(layer_name)
+                    logger.info(f"[LAYER PASS] {layer_name} | Score: {score:.2f} | Reason: {reason}")
+                else:
+                    failed_layers.append(layer_name)
+                    logger.warning(f"[LAYER FAIL] {layer_name} | Reason: {reason}")
                     return {
                         "action": "NO_TRADE", 
-                        "reason": f"{layer.__class__.__name__}: {res.get('reason', 'Filtered')}",
-                        "layer_results": results
+                        "reason": f"{layer_name}: {reason}",
+                        "layer_results": results,
+                        "passed_layers": passed_layers,
+                        "failed_layers": failed_layers
                     }
             except Exception as e:
                 logger.error(f"Error processing layer {layer.__class__.__name__}: {e}")
+                failed_layers.append(layer.__class__.__name__)
                 return {
                     "action": "NO_TRADE",
                     "reason": f"System Error in layer {layer.__class__.__name__}",
-                    "layer_results": results
+                    "layer_results": results,
+                    "passed_layers": passed_layers,
+                    "failed_layers": failed_layers
                 }
         
-        logger.info("All layers passed. Trade allowed.")
+        # All layers passed - log summary
+        logger.info("=" * 50)
+        logger.info(f"[SIGNAL] All {len(passed_layers)} Layers PASSED | Trade Allowed")
+        logger.info(f"[PASSED] {passed_layers}")
+        logger.info("=" * 50)
+        
         return {
             "action": "TRADE_ALLOWED", 
             "reason": "All Layers Passed", 
-            "layer_results": results
+            "layer_results": results,
+            "passed_layers": passed_layers,
+            "failed_layers": failed_layers
         }
 
     # Helper kept for legacy/compatibility if needed by other components
