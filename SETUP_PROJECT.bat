@@ -17,17 +17,17 @@ if %ERRORLEVEL% neq 0 (
     exit /b
 )
 echo [OK] Python detected.
-
-:: 2. Install/Update Core Dependencies
-echo [INFO] Installing required libraries into Global Python...
-python -m pip install --upgrade pip
-python -m pip install -r requirements_lite.txt
-
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Dependency installation failed. Check internet or Python permissions.
-    pause
-    exit /b
-)
+   
+   :: 2. Install/Update Core Dependencies
+   echo [INFO] Installing required libraries into Global Python...
+   python -m pip install --upgrade pip
+   python -m pip install -r requirements.txt
+   
+   if %ERRORLEVEL% neq 0 (
+       echo [ERROR] Dependency installation failed. Check internet or Python permissions.
+       pause
+       exit /b
+   )
 echo [OK] Libraries installed successfully.
 
 :: 3. Setup Folders (including news cache directory)
@@ -38,27 +38,28 @@ if not exist "storage\risk_state"  mkdir "storage\risk_state"
 if not exist "data"                mkdir "data"
 echo [OK] Folders ready.
 
-:: 4. Optional: Build React Lite Dashboard
-echo.
-echo [INFO] Checking for Node.js (optional - for React dashboard)...
-node --version >nul 2>&1
-if %ERRORLEVEL% equ 0 (
-    echo [OK] Node.js detected.
-    if exist "dashboard_lite\package.json" (
-        echo [INFO] Installing React dashboard dependencies...
-        cd dashboard_lite
-        call npm install --silent
-        echo [INFO] Building React dashboard...
-        call npm run build --silent
-        cd ..
-        echo [OK] React dashboard built at dashboard_lite\dist\
-    ) else (
-        echo [INFO] dashboard_lite\package.json not found. Skipping React build.
-    )
-) else (
-    echo [INFO] Node.js not found. React dashboard will be served pre-built.
-    echo        To enable dev mode: install Node.js 18+ and re-run SETUP_PROJECT.bat
-)
+:: 4. Optional: Build React Dashboard (if Node.js is present)
+   echo.
+   echo [INFO] Checking for Node.js (optional - for React dashboard development)...
+   node --version >nul 2>&1
+   if %ERRORLEVEL% equ 0 (
+       echo [OK] Node.js detected.
+       if exist "dashboard-react\package.json" (
+           echo [INFO] Installing React dashboard dependencies...
+           cd dashboard-react
+           call npm install --silent
+           echo [INFO] Building React dashboard...
+           call npm run build --silent
+           cd ..
+           echo [OK] React dashboard built at dashboard-react\build\
+           echo        (The system will serve the built dashboard from dashboard\ if available)
+       ) else (
+           echo [INFO] dashboard-react\package.json not found. Skipping React build.
+       )
+   ) else (
+       echo [INFO] Node.js not found. React dashboard development features skipped.
+       echo        To enable React dev mode: install Node.js 18+ and re-run SETUP_PROJECT.bat
+   )
 
 :: 5. Final summary
 echo.
