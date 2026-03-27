@@ -6,7 +6,8 @@ from .smc import (
     FVGDiscountLayer,
     DisplacementLayer,
     MicroMSSLayer,
-    KillzoneFilterLayer
+    KillzoneFilterLayer,
+    NewsEventLayer
 )
 
 logger = logging.getLogger("SMCLayers")
@@ -22,7 +23,8 @@ class LayerFactory:
         "FVGDiscount": FVGDiscountLayer,
         "Displacement": DisplacementLayer,
         "MicroMSS": MicroMSSLayer,
-        "KillzoneFilter": KillzoneFilterLayer
+        "KillzoneFilter": KillzoneFilterLayer,
+        "NewsEventLayer": NewsEventLayer
     }
 
     @staticmethod

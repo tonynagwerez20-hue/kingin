@@ -10,18 +10,25 @@
         "lite_mode": false,
         "enable_cli_dashboard": false,
         "enable_streamlit_dashboard": false,
+        "enable_react_dashboard": true,
+        "react_dashboard_port": 3000,
+        "react_dashboard_folder": "dashboard-react",
         "loop_delay_seconds": 3.0,
         "buffer_max_length": 100,
-        "heartbeat_interval_seconds": 15
+        "heartbeat_interval_seconds": 15,
+        "react_dashboard_api_port": 3001
     },
     "pipeline": {
         "active_data_source": "MT5_PROVIDER",
+        "enable_news_scalp": false,
+        "max_spread_points": 50,
         "data_provider": {
             "class_path": "Engine.mt5_provider.MT5DataProvider",
             "config": {
-                "login": 105771322,
-                "password": "4e_mOpDu",
-                "server": "FBS-Demo"
+                "login": 298686191,
+                "password": "@Tony.123",
+                "server": "Exness-MT5Trial9",
+                "utc_offset": 3
             }
         },
         "filtration_layers": [
@@ -35,7 +42,8 @@
             {
                 "class_path": "Engine.igof.layers.smc_layers.MechanicalStructureLayer",
                 "config": {
-                    "timeframe_key": "h1_candles"
+                    "timeframe_key": "h1_candles",
+                    "max_spread_points": 50
                 }
             },
             {
@@ -62,6 +70,20 @@
                 "config": {
                     "timeframe_key": "m1_candles"
                 }
+            },
+            {
+                "class_path": "Engine.igof.layers.smc_layers.NewsEventLayer",
+                "config": {
+                    "enable_news_scalp": false,
+                    "pre_news_block_minutes": 5,
+                    "post_news_scalp_minutes": 3,
+                    "min_impact_to_block": 2,
+                    "min_impact_to_scalp": 3,
+                    "us_events_only": true,
+                    "api_cache_minutes": 15,
+                    "finnhub_api_key": "",
+                    "local_cache_path": "storage/news_cache/calendar.json"
+                }
             }
         ],
         "strategies": [
@@ -74,7 +96,8 @@
                         "FVGDiscount",
                         "Displacement",
                         "MicroMSS",
-                        "KillzoneFilter"
+                        "KillzoneFilter",
+                        "NewsEventLayer"
                     ],
                     "min_total_score": 3.0,
                     "min_layers_passed": 3,
@@ -90,7 +113,10 @@
                     "min_equity_threshold": 7.5,
                     "max_daily_loss_pct": 5.0,
                     "max_concurrent_positions": 1,
-                    "enforced_lot_size": 0.01
+                    "min_lot_size": 0.01,
+                    "max_lot_size": 0.1,
+                    "seed_balance": 10.0,
+                    "profit_step_for_scaling": 15.0
                 }
             }
         ]

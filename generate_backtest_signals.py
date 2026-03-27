@@ -104,6 +104,11 @@ def run_mtf_backtest():
             risk_res = risk_rule.check_risk(signal)
             if risk_res.get("allowed"):
                 ea_action = "LONG" if signal.get("direction") == "BUY" else "SHORT"
+                
+                # Get execution type from liquidity layer or use default
+                execution_type = signal.get("execution_type", "MARKET")
+                limit_price = signal.get("limit_price", signal.get("price"))
+                
                 exec_row = {
                     "Time": current_m5_time.strftime('%Y.%m.%d %H:%M:%S'),
                     "Symbol": symbol,
@@ -113,7 +118,10 @@ def run_mtf_backtest():
                     "TP": f"{signal.get('tp'):.2f}",
                     "Lots": f"{risk_res.get('enforced_lots', 0.01):.2f}",
                     "Desc": "MTF_SMC_SIGNAL",
-                    "Magic": "123456"
+                    "Magic": "123456",
+                    "ExecutionType": execution_type,
+                    "LimitPrice": f"{limit_price:.2f}",
+                    "ConfluenceScore": f"{signal.get('score', 0):.2f}"
                 }
                 execution_signals.append(exec_row)
 

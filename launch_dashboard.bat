@@ -12,7 +12,7 @@ timeout /t 5 /nobreak > nul
 
 REM Start React development server
 echo [2/3] Starting React dashboard...
-start "Hedge Dashboard" cmd /k "cd /d %~dp0dashboard-react && npm run dev"
+start "Hedge Dashboard" cmd /k "cd /d %~dp0dashboard-react && ..\.venv_v2\Scripts\python.exe -m http.server 3000"
 timeout /t 10 /nobreak > nul
 
 REM Open dashboard in default browser

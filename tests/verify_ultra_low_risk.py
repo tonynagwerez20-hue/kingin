@@ -16,9 +16,10 @@ def test_dynamic_risk_scaling():
         "min_equity_threshold": 7.50,
         "max_daily_loss_pct": 5.0,
         "max_concurrent_positions": 1,
-        "enforced_lot_size": 0.01,
+        "min_lot_size": 0.01,
+        "max_lot_size": 0.1,
         "seed_balance": 10.0,
-        "profit_step_for_scaling": 5.0
+        "profit_step_for_scaling": 15.0
     }
     
     risk_rule = UltraLowAccountRiskRule(config)

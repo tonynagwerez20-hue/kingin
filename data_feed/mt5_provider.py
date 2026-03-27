@@ -7,6 +7,29 @@ from .base_provider import BaseDataProvider
 
 logger = logging.getLogger("MT5Provider")
 
+# Common symbol mappings for multi-broker compatibility (Gold variants)
+SYMBOL_ALTERNATIVES = {
+    "XAUUSD": [
+        # Try exact names first
+        "XAUUSD", "XAUUSD.i", "XAUUSD.x", "XAUUSDm",
+        "GOLD", "GOLD.i", "GOLD.x", "GOLDm",
+        # Try with various suffixes
+        "XAUUSDmicro", "GLD", "XAU", "XAUUSD_ECN",
+        "XAUUSDpro", "XAUUSDv", "XAUUSD#", "XAUUSD_",
+        "Gold", "XAU_USD", "XAU/USD", "GOLD_PRO",
+        "Au", "AUUSD", "XAUUSD.t",
+        # Exness specific
+        "XAUUSD-E", "XAUUSDm.E", "GOLD.E", "GOLDm",
+        # Try without suffix
+        "XAUUSDm.", "XAU.", "GOLD.",
+        # Add common broker variations
+        "XAUUSD_i", "XAUUSD_x", "GOLD_i", "GOLD_x",
+        # More alternatives
+        "GOLD#", "XAU#", "XAUUSDmicro.", "GOLDmicro"
+    ]
+}
+
+
 class MT5DataProvider(BaseDataProvider):
     """
     MT5 Implementation of the modular Data Provider.
@@ -27,6 +50,48 @@ class MT5DataProvider(BaseDataProvider):
         self.password = config.get("password")
         self.server = config.get("server")
         self.lite_mode = config.get("lite_mode", False)
+        self.config = config  # Store full config for access to utc_offset etc
+        self._symbol_map = {}  # Cache for resolved symbols
+
+    def _resolve_symbol(self, symbol: str) -> Optional[str]:
+        """
+        Auto-resolve symbol to available broker symbol.
+        Tries alternatives if exact match not found.
+        """
+        # Check cache first
+        if symbol in self._symbol_map:
+            return self._symbol_map[symbol]
+        
+        # If exact symbol exists, use it
+        if mt5.symbol_info(symbol):
+            self._symbol_map[symbol] = symbol
+            logger.info(f"[SYMBOL] Using exact match: {symbol}")
+            return symbol
+        
+        # Try alternatives from SYMBOL_ALTERNATIVES
+        alternatives = SYMBOL_ALTERNATIVES.get(symbol, [symbol])
+        for alt in alternatives:
+            if mt5.symbol_info(alt):
+                logger.info(f"[SYMBOL] Auto-mapped {symbol} -> {alt}")
+                self._symbol_map[symbol] = alt
+                return alt
+        
+        # Try wildcard search in available symbols
+        all_symbols = mt5.symbols_get()
+        available_symbol_names = []
+        if all_symbols:
+            for s in all_symbols:
+                name = s.name
+                available_symbol_names.append(name)
+                # Check if symbol name contains our base
+                for base in alternatives:
+                    if base in name or name.startswith(base.split('.')[0]):
+                        logger.info(f"[SYMBOL] Auto-mapped {symbol} -> {name}")
+                        self._symbol_map[symbol] = name
+                        return name
+        
+        logger.error(f"[SYMBOL] Could not resolve {symbol} - not found in terminal. Available symbols sample: {available_symbol_names[:20]}")
+        return None
 
     def connect(self) -> bool:
         # Strict parameterized initialization (using config credentials ONLY)
@@ -46,12 +111,27 @@ class MT5DataProvider(BaseDataProvider):
         
         if login_res:
             acc_info = mt5.account_info()
-            if acc_info and acc_info.login == int(self.login):
-                logger.info(f"MT5 Login Successful. Account: {acc_info.login}, Server: {acc_info.server}")
+            if acc_info:
+                # CRITICAL: Validate account matches config
+                actual_login = acc_info.login
+                if actual_login != int(self.login):
+                    logger.error(f"ACCOUNT MISMATCH! Config: {self.login}, Actual: {actual_login}")
+                    logger.error("SYSTEM WILL NOT TRADE - Wrong account detected!")
+                    mt5.shutdown()
+                    return False
+                
+                logger.info(f"[ACCOUNT VALIDATED] Account: {acc_info.login}, Server: {acc_info.server}, Balance: ${acc_info.balance:.2f}")
+                logger.info(f"[BROKER TIME] UTC Offset configured: {self.config.get('utc_offset', 'Not set')}")
+                
+                # Log available symbols for debugging
+                all_symbols = mt5.symbols_get()
+                if all_symbols:
+                    symbol_names = [s.name for s in all_symbols][:20]  # First 20
+                    logger.info(f"[SYMBOLS] Available (sample): {symbol_names}...")
+                
                 return True
             else:
-                current = acc_info.login if acc_info else 'None'
-                logger.error(f"MT5 Login claimed success but account is {current}, not {self.login}")
+                logger.error("MT5 account_info() returned None after successful login.")
                 return False
         else:
             logger.error(f"MT5 Login failed for account {self.login}: {mt5.last_error()}")
@@ -64,18 +144,24 @@ class MT5DataProvider(BaseDataProvider):
     def get_latest_candles(self, symbol: str, timeframe: str, count: int) -> list:
         mt5_tf = self.TIMEFRAME_MAP.get(timeframe, mt5.TIMEFRAME_M5)
         
+        # Auto-resolve symbol
+        resolved_symbol = self._resolve_symbol(symbol)
+        if not resolved_symbol:
+            logger.error(f"Symbol {symbol} could not be resolved.")
+            return []
+        
         # Ensure symbol is selected and synced
-        symbol_info = mt5.symbol_info(symbol)
+        symbol_info = mt5.symbol_info(resolved_symbol)
         if symbol_info is None:
-            logger.error(f"Symbol {symbol} not found in terminal.")
+            logger.error(f"Symbol {resolved_symbol} not found in terminal.")
             return []
             
         if not symbol_info.visible:
-            if not mt5.symbol_select(symbol, True):
-                logger.error(f"Failed to select symbol {symbol}: {mt5.last_error()}")
+            if not mt5.symbol_select(resolved_symbol, True):
+                logger.error(f"Failed to select symbol {resolved_symbol}: {mt5.last_error()}")
                 return []
         
-        rates = mt5.copy_rates_from_pos(symbol, mt5_tf, 0, count)
+        rates = mt5.copy_rates_from_pos(resolved_symbol, mt5_tf, 0, count)
         if rates is None or len(rates) == 0:
             err = mt5.last_error()
             logger.warning(f"No history found for {symbol} on {timeframe}. MT5 Error: {err}")
@@ -92,7 +178,12 @@ class MT5DataProvider(BaseDataProvider):
         """
         Fetch latest 10 ticks and convert to 'mini-candles' for stitching.
         """
-        ticks = mt5.copy_ticks_from(symbol, datetime.now(), 10, mt5.COPY_TICKS_ALL)
+        # Auto-resolve symbol
+        resolved_symbol = self._resolve_symbol(symbol)
+        if not resolved_symbol:
+            return pd.DataFrame()
+            
+        ticks = mt5.copy_ticks_from(resolved_symbol, datetime.now(), 10, mt5.COPY_TICKS_ALL)
         if ticks is None or len(ticks) == 0:
             return pd.DataFrame()
             
@@ -104,7 +195,12 @@ class MT5DataProvider(BaseDataProvider):
         """
         Fetch the absolute latest tick (bid/ask).
         """
-        tick = mt5.symbol_info_tick(symbol)
+        # Auto-resolve symbol
+        resolved_symbol = self._resolve_symbol(symbol)
+        if not resolved_symbol:
+            return {"bid": 0.0, "ask": 0.0, "time": datetime.now().timestamp()}
+            
+        tick = mt5.symbol_info_tick(resolved_symbol)
         if tick is None:
             return {"bid": 0.0, "ask": 0.0, "time": datetime.now().timestamp()}
             

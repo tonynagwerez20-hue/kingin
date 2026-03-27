@@ -36,9 +36,19 @@ def main():
     print("[2/3] Waiting for server to initialize...")
     time.sleep(5)
     
-    # Check if React dev server is running, if not start it
-    print("[3/3] Launching dashboard in browser...")
+    # Start dashboard server (simple HTTP server for static files)
+    print("[3/3] Starting dashboard server...")
     dashboard_path = project_root / "dashboard-react"
+    dashboard_process = subprocess.Popen(
+        [sys.executable, "-m", "http.server", "3000"],
+        cwd=str(dashboard_path),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    print(f"   Dashboard server PID: {dashboard_process.pid}")
+    
+    # Wait a moment for the dashboard server to start
+    time.sleep(2)
     
     # Try to open the dashboard URL
     dashboard_url = "http://localhost:3000"
@@ -57,7 +67,9 @@ def main():
     except KeyboardInterrupt:
         print("\n\nShutting down...")
         server_process.terminate()
+        dashboard_process.terminate()
         server_process.wait()
+        dashboard_process.wait()
         print("Server stopped.")
 
 if __name__ == "__main__":
