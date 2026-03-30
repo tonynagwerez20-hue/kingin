@@ -337,11 +337,11 @@ class DashboardApp:
         self._append_log("Engine START requested via dashboard.")
         try:
             subprocess.Popen(
-                ["cmd.exe", "/c", "SYSTEM_ON.bat"],
+                ["cmd.exe", "/c", "START_ALL.bat"],
                 cwd=BASE_DIR,
                 creationflags=0x08000000  # CREATE_NO_WINDOW
             )
-            self._append_log("SYSTEM_ON.bat executed in background.")
+            self._append_log("START_ALL.bat executed in background.")
         except Exception as e:
             self._append_log(f"Failed to start engine: {e}")
 
