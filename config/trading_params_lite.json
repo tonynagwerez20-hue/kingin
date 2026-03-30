@@ -26,7 +26,7 @@
             "class_path": "Engine.mt5_provider.MT5DataProvider",
             "config": {
                 "login": 298686191,
-                "password": "@Tony.123",
+                "password": "",
                 "server": "Exness-MT5Trial9",
                 "utc_offset": 3
             }

@@ -42,6 +42,17 @@ except Exception as _e:
 BASE_DIR = Path(__file__).resolve().parent.parent
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ── StateExporter: writes engine_state.json for the tkinter dashboard ─────────
+try:
+    from state_exporter import StateExporter as _StateExporter
+    _state_exporter = _StateExporter(str(BASE_DIR / "engine_state.json"))
+except Exception as _se_err:
+    _state_exporter = None
+    logging.getLogger("ModularBootstrapper").warning(
+        f"[StateExporter] Not available — dashboard will show OFFLINE: {_se_err}"
+    )
+# ─────────────────────────────────────────────────────────────────────────────
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -564,6 +575,53 @@ class ModularBootstrapper:
                     # Update CLI Dashboard
                     if dashboard:
                         dashboard.update(current_state)
+
+                    # ── Write engine_state.json for tkinter desktop dashboard ─
+                    if _state_exporter:
+                        acc     = current_state.get("account", {})
+                        market  = current_state.get("market",  {})
+                        sigs    = current_state.get("signals", [])
+                        last_sig = sigs[-1] if sigs else {}
+                        price    = market.get("price", 0.0)
+                        bias_raw = market.get("htf_bias", "NEUTRAL").upper()
+                        layer_list = []
+                        for lp in current_state.get("pipeline", []):
+                            layer_list.append({
+                                "name":   lp.get("name", ""),
+                                "passed": lp.get("status", False),
+                                "score":  lp.get("score",  0.0),
+                                "reason": lp.get("reason", ""),
+                            })
+                        conf_score = sum(l["score"] for l in layer_list)
+                        kz_name = ""
+                        for lp in layer_list:
+                            if "Killzone" in lp["name"]:
+                                kz_name = lp.get("reason", "")[:28]
+                                break
+                        _state_exporter.export({
+                            "timestamp":        datetime.now(timezone.utc).isoformat(),
+                            "symbol":           market.get("symbol", symbol),
+                            "bias":             bias_raw,
+                            "current_price":    price,
+                            "signal_action":    last_sig.get("action", "NONE"),
+                            "entry_price":      last_sig.get("price",  price),
+                            "stop_loss":        last_sig.get("sl",     0.0),
+                            "take_profit":      last_sig.get("tp",     0.0),
+                            "lot_size":         last_sig.get("lots",   0.01),
+                            "execution_type":   last_sig.get("execution_type", "MARKET"),
+                            "confluence_score": conf_score,
+                            "killzone_name":    kz_name,
+                            "session_time":     "",
+                            "rr_ratio":         "—",
+                            "layers":           layer_list,
+                            "last_trade":       last_sig,
+                            "account_equity":   acc.get("equity",   0.0),
+                            "account_balance":  acc.get("balance",  0.0),
+                            "floating_pnl":     acc.get("daily_pnl", 0.0),
+                            "open_trades_count":0,
+                            "open_positions":   [],
+                            "active_warnings":  [],
+                        })
 
                     time.sleep(self.loop_delay)
 

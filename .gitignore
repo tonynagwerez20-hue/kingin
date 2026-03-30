@@ -50,3 +50,21 @@ performance_report.csv
 *.log
 output.log
 storage/logs/
+
+# ── ITS Desktop App — SECURITY EXCLUSIONS ────────────────────────────────────
+# NEVER commit credentials or live session data
+credentials.json
+runtime_credentials.json
+engine_state.json
+engine_state.tmp
+
+# Icon assets (generated at install time — not needed in repo)
+its_icon.ico
+its_icon.png
+
+# Scratch / temp tools
+_install_readme.py
+
+# MT5 trading config — password field must stay blank in repo
+# Actual password is entered at login and never written to disk
+# config/trading_params_lite.json is committed WITH password="" only

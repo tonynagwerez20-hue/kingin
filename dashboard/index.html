@@ -13,6 +13,71 @@
   --blue:#40c4ff;--orange:#ff9100;--purple:#b388ff;
   --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
 }
+
+/* Boot Screen Styles */
+.boot-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  font-family: var(--mono);
+}
+
+.boot-content {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(10, 12, 15, 0.9);
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  box-shadow: 0 0 30px rgba(0, 230, 118, 0.3);
+}
+
+.boot-content h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(90deg, #fff 0%, #00e676 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 1.5rem;
+}
+
+.boot-status {
+  color: var(--text);
+  font-size: 1.2rem;
+  margin-bottom: 1.5rem;
+  min-height: 2rem;
+}
+
+.progress-bar {
+  width: 300px;
+  height: 4px;
+  background: var(--bg2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 0 auto 1.5rem;
+}
+
+.progress {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.boot-details {
+  color: var(--dim);
+  font-size: 0.9rem;
+  text-align: left;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;overflow:hidden}
 #app{display:grid;height:100vh;grid-template-rows:44px 1fr 28px;grid-template-columns:1fr}
@@ -22,9 +87,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--m
 #sidebar{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 #centre{display:flex;flex-direction:column;overflow:hidden}
 #right{border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.panel{border-bottom:1px solid var(--border);padding:10px 12px;flex-shrink:0}
-.panel-title{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;font-family:var(--sans)}
+.panel{border-bottom:1px solid var(--border);padding:10px 12px;flex-shrink:0;position:relative;background:var(--bg1);transition:all 0.2s ease}
+.panel-title{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;font-family:var(--sans);display:flex;justify-content:space-between;align-items:center;cursor:grab}
+.panel-title:active{cursor:grabbing}
+.panel-title .collapse-btn{font-size:12px;color:var(--dim);width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:3px;transition:all 0.2s ease}
+.panel-title .collapse-btn:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+.panel.collapsed{height:auto;min-height:38px}
+.panel.collapsed > *:not(.panel-title){display:none}
 .panel:last-child{border-bottom:none;flex:1;overflow-y:auto}
+.panel.dragging{opacity:0.8;pointer-events:none;z-index:100}
 .kv{display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;font-size:12px}
 .kv .k{color:var(--dim);font-size:11px}.kv .v{font-weight:500}
 .pill{display:inline-block;padding:1px 6px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:.05em}
@@ -34,6 +105,40 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--m
 .pill-blue{background:rgba(64,196,255,.12);color:var(--blue);border:1px solid rgba(64,196,255,.25)}
 .pill-orange{background:rgba(255,145,0,.12);color:var(--orange);border:1px solid rgba(255,145,0,.25)}
 .pill-dim{background:rgba(80,90,106,.15);color:var(--dim);border:1px solid rgba(80,90,106,.25)}
+
+/* Panel Toggle Bar Styles */
+.panel-toggle-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.panel-toggle-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+
+.panel-toggle-btn.active {
+  background: var(--blue);
+  color: white;
+  border-color: var(--blue);
+  box-shadow: 0 0 10px rgba(64,196,255,0.3);
+}
+
+.panel-toggle-btn:active {
+  transform: translateY(0);
+}
 .layer-row{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)}
 .layer-row:last-child{border-bottom:none}
 .layer-name{flex:1;font-size:11px}.layer-score{font-size:10px;color:var(--dim);width:30px;text-align:right}
@@ -65,24 +170,40 @@ svg.sparkline{width:100%;height:60px;display:block}.spark-line{fill:none;stroke-
 </style>
 </head>
 <body>
+<div id="boot-screen" class="boot-screen">
+  <div class="boot-content">
+    <h1>HedgeEA</h1>
+    <p class="boot-status">Initializing system...</p>
+    <div class="progress-bar">
+      <div class="progress"></div>
+    </div>
+    <div class="boot-details"></div>
+  </div>
+</div>
 <div id="app">
 
 <div id="header">
   <div style="display:flex;align-items:center;gap:10px">
-    <span class="live-dot"></span>
-    <span style="font-weight:600;font-size:14px;letter-spacing:.04em">HedgeEA</span>
-    <span style="color:var(--dim);font-size:11px">v6.2 · SMC Terminal</span>
+  <span class="live-dot"></span>
+  <span style="font-weight:600;font-size:14px;letter-spacing:.04em">HedgeEA</span>
+  <span style="color:var(--dim);font-size:11px">v6.2 · SMC Terminal</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;font-size:11px">
+  <span id="master-badge" class="pill pill-green">MASTER ON</span>
+  <span id="regime-badge"></span>
+  <span style="color:var(--dim)" id="runtime-el">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);flex-wrap:wrap">
+  <div id="engine-controls">
+    <button id="start-btn" onclick="startEngine()" style="background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;cursor:pointer;letter-spacing:.05em">START</button>
+    <button id="stop-btn" onclick="stopEngine()" style="background:rgba(255,61,92,.12);border:1px solid rgba(255,61,92,.3);color:var(--red);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;cursor:pointer;letter-spacing:.05em;margin-left:4px">STOP</button>
+    <button id="restart-btn" onclick="restartEngine()" style="background:rgba(64,196,255,.12);border:1px solid rgba(64,196,255,.3);color:var(--blue);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;cursor:pointer;letter-spacing:.05em;margin-left:4px">RESTART</button>
+    <button id="settings-btn" onclick="openSettingsModal()" style="background:rgba(138,43,226,.12);border:1px solid rgba(138,43,226,.3);color:var(--purple);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;cursor:pointer;letter-spacing:.05em;margin-left:4px">⚙ SETTINGS</button>
+    <span id="uptime-counter" style="margin-left:8px;font-family:var(--mono);">Uptime: 00:00:00</span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;font-size:11px">
-    <span id="master-badge" class="pill pill-green">MASTER ON</span>
-    <span id="regime-badge"></span>
-    <span style="color:var(--dim)" id="runtime-el">—</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim)">
-    <button id="kill-btn" onclick="toggleMaster()" style="background:rgba(255,61,92,.12);border:1px solid rgba(255,61,92,.3);color:var(--red);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;cursor:pointer;letter-spacing:.05em">KILL</button>
-    <span id="conn-dot"></span><span id="conn-label">CONNECTING...</span>
-    <span id="clock-el"></span>
-  </div>
+  <span id="conn-dot"></span><span id="conn-label">CONNECTING...</span>
+  <span id="clock-el"></span>
+</div>
 </div>
 
 <div id="main">
@@ -108,23 +229,27 @@ svg.sparkline{width:100%;height:60px;display:block}.spark-line{fill:none;stroke-
   </div>
 
   <div id="centre">
-    <div id="price-block">
-      <div style="font-size:11px;color:var(--dim);letter-spacing:.12em">XAUUSD · M5</div>
-      <div id="price-val" style="color:var(--text)">—</div>
-      <div id="price-chg"></div>
-      <div id="bid-ask"><span>BID <strong id="bid-val" style="color:var(--red)">—</strong></span><span>ASK <strong id="ask-val" style="color:var(--green)">—</strong></span></div>
-    </div>
-    <div id="chart-wrap">
-      <div style="font-size:9px;color:var(--dim);letter-spacing:.1em;margin-bottom:4px">PRICE HISTORY · LAST 50 BARS</div>
-      <svg class="sparkline" viewBox="0 0 600 60" preserveAspectRatio="none">
-        <defs><linearGradient id="grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#40c4ff" stop-opacity=".4"/><stop offset="100%" stop-color="#40c4ff" stop-opacity="0"/></linearGradient></defs>
-        <path id="spark-area" class="spark-area" fill="url(#grad)"/>
-        <path id="spark-path" class="spark-line" stroke="#40c4ff"/>
-      </svg>
-    </div>
-    <div style="padding:6px 12px;border-bottom:1px solid var(--border);font-size:9px;color:var(--dim);letter-spacing:.12em">SIGNAL FEED</div>
+  <div class="panel">
+    <div class="panel-title">Price</div>
+    <div style="font-size:11px;color:var(--dim);letter-spacing:.12em">XAUUSD · M5</div>
+    <div id="price-val" style="color:var(--text)">—</div>
+    <div id="price-chg"></div>
+    <div id="bid-ask"><span>BID <strong id="bid-val" style="color:var(--red)">—</strong></span><span>ASK <strong id="ask-val" style="color:var(--green)">—</strong></span></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Chart</div>
+    <div style="font-size:9px;color:var(--dim);letter-spacing:.1em;margin-bottom:4px">PRICE HISTORY · LAST 50 BARS</div>
+    <svg class="sparkline" viewBox="0 0 600 60" preserveAspectRatio="none">
+      <defs><linearGradient id="grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#40c4ff" stop-opacity=".4"/><stop offset="100%" stop-color="#40c4ff" stop-opacity="0"/></linearGradient></defs>
+      <path id="spark-area" class="spark-area" fill="url(#grad)"/>
+      <path id="spark-path" class="spark-line" stroke="#40c4ff"/>
+    </svg>
+  </div>
+  <div class="panel" style="flex:1;overflow-y:auto">
+    <div class="panel-title">Signal Feed</div>
     <div id="signal-feed"></div>
   </div>
+</div>
 
   <div id="right">
     <div class="panel" style="flex-shrink:0">
@@ -145,6 +270,9 @@ svg.sparkline{width:100%;height:60px;display:block}.spark-line{fill:none;stroke-
     <span id="api-err" style="color:var(--red);display:none">✕ unreachable</span>
   </span>
   <span>HedgeEA SMC v6.2 · <span id="refresh-rate">3s</span></span>
+</div>
+<div id="panel-toggle-bar" style="border-top:1px solid var(--border);display:flex;justify-content:center;gap:8px;padding:8px 0;background:var(--bg1);flex-wrap:wrap">
+  <!-- Panel toggle buttons will be dynamically generated -->
 </div>
 </div>
 
@@ -404,7 +532,295 @@ async function toggleMaster(){
   }catch{btn.textContent='ERR';setTimeout(()=>{btn.textContent='KILL';},1500);}
 }
 
+// Boot sequence
+function startBootSequence() {
+  const bootScreen = document.getElementById('boot-screen');
+  const bootStatus = document.querySelector('.boot-status');
+  const bootDetails = document.querySelector('.boot-details');
+  const progressBar = document.querySelector('.progress');
+  
+  const bootSteps = [
+    { text: 'Initializing system...', detail: 'Loading core modules...', delay: 500 },
+    { text: 'Checking MT5 connection...', detail: 'Verifying broker credentials...', delay: 800 },
+    { text: 'Starting data feed...', detail: 'Connecting to price providers...', delay: 600 },
+    { text: 'Loading trading strategies...', detail: 'Initializing SMC layers...', delay: 700 },
+    { text: 'Activating risk management...', detail: 'Setting up position limits...', delay: 500 },
+    { text: 'Starting execution engine...', detail: 'Preparing order routing...', delay: 600 },
+    { text: 'Loading dashboard components...', detail: 'Initializing UI modules...', delay: 400 },
+    { text: 'System ready!', detail: 'All systems operational', delay: 300 }
+  ];
+  
+  let stepIndex = 0;
+  
+  function executeStep() {
+    if (stepIndex < bootSteps.length) {
+      const step = bootSteps[stepIndex];
+      bootStatus.textContent = step.text;
+      bootDetails.textContent = step.detail;
+      
+      // Animate progress bar
+      const progressPercent = ((stepIndex + 1) / bootSteps.length) * 100;
+      progressBar.style.width = progressPercent + '%';
+      
+      stepIndex++;
+      setTimeout(executeStep, step.delay);
+    } else {
+      // Boot complete, hide boot screen and show app
+      setTimeout(() => {
+        bootScreen.style.opacity = '0';
+        setTimeout(() => {
+          bootScreen.style.display = 'none';
+          document.getElementById('app').style.display = 'grid';
+        }, 500);
+      }, 500);
+    }
+  }
+  
+  // Start boot sequence after a brief moment
+  setTimeout(executeStep, 300);
+}
+
+// Draggable panels functionality
+function makePanelsDraggable() {
+  const panels = document.querySelectorAll('#sidebar .panel, #centre .panel, #right .panel');
+  let draggedPanel = null;
+  let offsetX = 0, offsetY = 0;
+  let originalIndex = 0;
+  
+  panels.forEach(panel => {
+    const handle = panel.querySelector('.panel-title');
+    
+    handle.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('collapse-btn')) return;
+      
+      draggedPanel = panel;
+      originalIndex = Array.from(panel.parentNode.children).indexOf(panel);
+      
+      // Get position relative to panel
+      const rect = panel.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      
+      panel.classList.add('dragging');
+      panel.style.position = 'absolute';
+      panel.style.zIndex = '1000';
+      panel.style.width = rect.width + 'px';
+      
+      // Create placeholder
+      const placeholder = document.createElement('div');
+      placeholder.style.height = rect.height + 'px';
+      placeholder.style.width = rect.width + 'px';
+      panel.parentNode.insertBefore(placeholder, panel.nextSibling);
+    });
+    
+    // Collapse button
+    const collapseBtn = document.createElement('div');
+    collapseBtn.className = 'collapse-btn';
+    collapseBtn.innerHTML = '−';
+    collapseBtn.title = 'Collapse/Expand';
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      panel.classList.toggle('collapsed');
+      collapseBtn.innerHTML = panel.classList.contains('collapsed') ? '+' : '−';
+      updatePanelToggleBar();
+    });
+    handle.appendChild(collapseBtn);
+  });
+  
+  // Mouse move and up events
+  document.addEventListener('mousemove', (e) => {
+    if (!draggedPanel) return;
+    
+    const x = e.clientX - offsetX;
+    const y = e.clientY - offsetY;
+    
+    draggedPanel.style.left = x + 'px';
+    draggedPanel.style.top = y + 'px';
+  });
+  
+  document.addEventListener('mouseup', () => {
+    if (draggedPanel) {
+      const placeholder = draggedPanel.previousElementSibling;
+      if (placeholder && placeholder.nodeType === 1 && placeholder.style.height) {
+        draggedPanel.parentNode.insertBefore(draggedPanel, placeholder);
+        placeholder.remove();
+      }
+      
+      draggedPanel.classList.remove('dragging');
+      draggedPanel.style.position = '';
+      draggedPanel.style.zIndex = '';
+      draggedPanel.style.left = '';
+      draggedPanel.style.top = '';
+      draggedPanel.style.width = '';
+      draggedPanel = null;
+    }
+  });
+}
+
+// Draggable panels functionality
+function makePanelsDraggable() {
+  const panels = document.querySelectorAll('#sidebar .panel, #centre .panel, #right .panel');
+  let draggedPanel = null;
+  let offsetX = 0, offsetY = 0;
+  let originalIndex = 0;
+  
+  panels.forEach(panel => {
+    const handle = panel.querySelector('.panel-title');
+    
+    handle.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('collapse-btn')) return;
+      
+      draggedPanel = panel;
+      originalIndex = Array.from(panel.parentNode.children).indexOf(panel);
+      
+      // Get position relative to panel
+      const rect = panel.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      
+      panel.classList.add('dragging');
+      panel.style.position = 'absolute';
+      panel.style.zIndex = '1000';
+      panel.style.width = rect.width + 'px';
+      
+      // Create placeholder
+      const placeholder = document.createElement('div');
+      placeholder.style.height = rect.height + 'px';
+      placeholder.style.width = rect.width + 'px';
+      panel.parentNode.insertBefore(placeholder, panel.nextSibling);
+    });
+    
+    // Collapse button
+    const collapseBtn = document.createElement('div');
+    collapseBtn.className = 'collapse-btn';
+    collapseBtn.innerHTML = '−';
+    collapseBtn.title = 'Collapse/Expand';
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      panel.classList.toggle('collapsed');
+      collapseBtn.innerHTML = panel.classList.contains('collapsed') ? '+' : '−';
+      updatePanelToggleBar();
+    });
+    handle.appendChild(collapseBtn);
+  });
+  
+  // Mouse move and up events
+  document.addEventListener('mousemove', (e) => {
+    if (!draggedPanel) return;
+    
+    const x = e.clientX - offsetX;
+    const y = e.clientY - offsetY;
+    
+    draggedPanel.style.left = x + 'px';
+    draggedPanel.style.top = y + 'px';
+  });
+  
+  document.addEventListener('mouseup', () => {
+    if (draggedPanel) {
+      const placeholder = draggedPanel.previousElementSibling;
+      if (placeholder && placeholder.nodeType === 1 && placeholder.style.height) {
+        draggedPanel.parentNode.insertBefore(draggedPanel, placeholder);
+        placeholder.remove();
+      }
+      
+      draggedPanel.classList.remove('dragging');
+      draggedPanel.style.position = '';
+      draggedPanel.style.zIndex = '';
+      draggedPanel.style.left = '';
+      draggedPanel.style.top = '';
+      draggedPanel.style.width = '';
+      draggedPanel = null;
+    }
+  });
+}
+
+// Engine control functions
+let engineStarted = false;
+let engineStartTime = 0;
+let uptimeInterval = null;
+
+function startEngine() {
+  if (!engineStarted) {
+    engineStarted = true;
+    engineStartTime = Date.now();
+    startUptimeCounter();
+    updateEngineUI();
+    // Simulate API call to start engine
+    console.log('Engine started');
+  }
+}
+
+function stopEngine() {
+  if (engineStarted) {
+    engineStarted = false;
+    stopUptimeCounter();
+    updateEngineUI();
+    // Simulate API call to stop engine
+    console.log('Engine stopped');
+  }
+}
+
+function restartEngine() {
+  stopEngine();
+  setTimeout(startEngine, 1000);
+}
+
+function startUptimeCounter() {
+  stopUptimeCounter(); // Clear any existing interval
+  uptimeInterval = setInterval(updateUptimeDisplay, 1000);
+  updateUptimeDisplay(); // Update immediately
+}
+
+function stopUptimeCounter() {
+  if (uptimeInterval) {
+    clearInterval(uptimeInterval);
+    uptimeInterval = null;
+  }
+}
+
+function updateUptimeDisplay() {
+  if (engineStarted) {
+    const elapsed = Date.now() - engineStartTime;
+    const hours = Math.floor(elapsed / (1000 * 60 * 60));
+    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((elapsed % (1000 * 60)) / 1000);
+    
+    const formatted = 
+      String(hours).padStart(2, '0') + ':' +
+      String(minutes).padStart(2, '0') + ':' +
+      String(seconds).padStart(2, '0');
+    
+    document.getElementById('uptime-counter').textContent = 'Uptime: ' + formatted;
+  }
+}
+
+function updateEngineUI() {
+  const startBtn = document.getElementById('start-btn');
+  const stopBtn = document.getElementById('stop-btn');
+  const restartBtn = document.getElementById('restart-btn');
+  
+  if (engineStarted) {
+    startBtn.style.opacity = '0.5';
+    startBtn.style.cursor = 'not-allowed';
+    stopBtn.style.opacity = '1';
+    stopBtn.style.cursor = 'pointer';
+    restartBtn.style.opacity = '1';
+    restartBtn.style.cursor = 'pointer';
+  } else {
+    startBtn.style.opacity = '1';
+    startBtn.style.cursor = 'pointer';
+    stopBtn.style.opacity = '0.5';
+    stopBtn.style.cursor = 'not-allowed';
+    restartBtn.style.opacity = '0.5';
+    restartBtn.style.cursor = 'not-allowed';
+  }
+}
+
+// Initialize app as hidden initially
+document.getElementById('app').style.display = 'none';
+
 // Boot — render persisted state immediately (zero blank-flash on reload)
+startBootSequence();
 render();
 poll();
 setInterval(poll, REFRESH);
@@ -417,6 +833,209 @@ setInterval(()=>{
   const h=String(Math.floor(e/3600)).padStart(2,'0'),m=String(Math.floor((e%3600)/60)).padStart(2,'0'),s=String(e%60).padStart(2,'0');
   document.getElementById('runtime-el').textContent=`${h}:${m}:${s}`;
 },1000);
+
+// Panel toggle bar functionality
+function createPanelToggleBar() {
+  const toggleBar = document.getElementById('panel-toggle-bar');
+  const panels = document.querySelectorAll('#sidebar .panel, #centre .panel, #right .panel');
+  
+  toggleBar.innerHTML = ''; // Clear existing buttons
+  
+  panels.forEach((panel, index) => {
+    const titleEl = panel.querySelector('.panel-title');
+    const panelName = titleEl ? titleEl.textContent.trim() : `Panel ${index + 1}`;
+    
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'panel-toggle-btn';
+    toggleBtn.textContent = panelName;
+    toggleBtn.title = `Toggle ${panelName}`;
+    toggleBtn.dataset.panelIndex = index;
+    
+    // Check if panel is currently visible (not collapsed and has content)
+    const isVisible = !panel.classList.contains('collapsed') && 
+                     panel.querySelector(':scope > *:not(.panel-title)') !== null;
+    toggleBtn.classList.toggle('active', isVisible);
+    
+    toggleBtn.addEventListener('click', () => {
+      // Toggle panel visibility (collapse/expand)
+      panel.classList.toggle('collapsed');
+      const collapseBtn = panel.querySelector('.collapse-btn');
+      if (collapseBtn) {
+        collapseBtn.innerHTML = panel.classList.contains('collapsed') ? '+' : '−';
+      }
+      
+      // Update toggle button active state
+      const isNowVisible = !panel.classList.contains('collapsed') && 
+                          panel.querySelector(':scope > *:not(.panel-title)') !== null;
+      toggleBtn.classList.toggle('active', isNowVisible);
+    });
+    
+    toggleBar.appendChild(toggleBtn);
+  });
+}
+
+// Update panel toggle bar when panels are collapsed/expanded
+function updatePanelToggleBar() {
+  setTimeout(createPanelToggleBar, 100);
+}
+
+// Make panels draggable after DOM is loaded
+setTimeout(makePanelsDraggable, 1000);
+setTimeout(createPanelToggleBar, 1000);
+setTimeout(createPanelToggleBar, 1000);
+
+// Update panel toggle bar when panels are collapsed/expanded
+function updatePanelToggleBar() {
+  setTimeout(createPanelToggleBar, 100);
+}
 </script>
+<!-- Settings Modal -->
+<div id="settings-modal" class="settings-modal">
+  <div class="settings-modal-content">
+    <div class="settings-modal-header">
+      <h2>⚙ Settings</h2>
+      <button id="settings-close-btn" class="settings-close-btn">&times;</button>
+    </div>
+    <div class="settings-modal-body">
+      <div class="settings-tab-container">
+        <button class="settings-tab-btn active" data-tab="trading">Trading</button>
+        <button class="settings-tab-btn" data-tab="risk">Risk Rules</button>
+        <button class="settings-tab-btn" data-tab="pipeline">Pipeline</button>
+        <button class="settings-tab-btn" data-tab="mt5">MT5 Connection</button>
+        <button class="settings-tab-btn" data-tab="dashboard">Dashboard</button>
+      </div>
+      <div class="settings-tabs-content">
+        <!-- Trading Tab -->
+        <div class="settings-tab active" id="trading-tab">
+          <h3>Trading Settings</h3>
+          <div class="settings-group">
+            <label>Symbol:</label>
+            <input type="text" id="settings-symbol" value="XAUUSD">
+          </div>
+          <div class="settings-group">
+            <label>Default Account Balance ($):</label>
+            <input type="number" id="settings-balance" value="10" step="0.01">
+          </div>
+          <div class="settings-group">
+            <label>Master Switch:</label>
+            <select id="settings-master-switch">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Risk Rules Tab -->
+        <div class="settings-tab" id="risk-tab">
+          <h3>Risk Rules Settings</h3>
+          <div class="settings-group">
+            <label>Min Equity Threshold ($):</label>
+            <input type="number" id="settings-min-equity" value="7.5" step="0.1">
+          </div>
+          <div class="settings-group">
+            <label>Max Daily Loss (%):</label>
+            <input type="number" id="settings-max-daily-loss" value="5.0" step="0.1">
+          </div>
+          <div class="settings-group">
+            <label>Max Concurrent Positions:</label>
+            <input type="number" id="settings-max-concurrent" value="1" min="1">
+          </div>
+          <div class="settings-group">
+            <label>Min Lot Size:</label>
+            <input type="number" id="settings-min-lot" value="0.01" step="0.01">
+          </div>
+          <div class="settings-group">
+            <label>Max Lot Size:</label>
+            <input type="number" id="settings-max-lot" value="0.1" step="0.01">
+          </div>
+          <div class="settings-group">
+            <label>Seed Balance ($):</label>
+            <input type="number" id="settings-seed-balance" value="10.0" step="0.1">
+          </div>
+          <div class="settings-group">
+            <label>Profit Step for Scaling ($):</label>
+            <input type="number" id="settings-profit-step" value="15.0" step="0.1">
+          </div>
+        </div>
+        
+        <!-- Pipeline Tab -->
+        <div class="settings-tab" id="pipeline-tab">
+          <h3>Pipeline Settings</h3>
+          <div class="settings-group">
+            <label>Active Data Source:</label>
+            <select id="settings-data-source">
+              <option value="MT5_PROVIDER">MT5 Provider</option>
+              <option value="SIERRA_PROVIDER">Sierra Provider</option>
+            </select>
+          </div>
+          <div class="settings-group">
+            <label>Enable News Scalp:</label>
+            <select id="settings-news-scalp">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="settings-group">
+            <label>Max Spread Points:</label>
+            <input type="number" id="settings-max-spread" value="50" min="1">
+          </div>
+        </div>
+        
+        <!-- MT5 Connection Tab -->
+        <div class="settings-tab" id="mt5-tab">
+          <h3>MT5 Connection Settings</h3>
+          <div class="settings-group">
+            <label>Login:</label>
+            <input type="text" id="settings-mt5-login" value="298686191">
+          </div>
+          <div class="settings-group">
+            <label>Password:</label>
+            <input type="password" id="settings-mt5-password" value="@Tony.123">
+          </div>
+          <div class="settings-group">
+            <label>Server:</label>
+            <input type="text" id="settings-mt5-server" value="Exness-MT5Trial9">
+          </div>
+          <div class="settings-group">
+            <label>UTC Offset:</label>
+            <input type="number" id="settings-mt5-utc-offset" value="3">
+          </div>
+        </div>
+        
+        <!-- Dashboard Tab -->
+        <div class="settings-tab" id="dashboard-tab">
+          <h3>Dashboard Settings</h3>
+          <div class="settings-group">
+            <label>Enable React Dashboard:</label>
+            <select id="settings-react-dashboard">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="settings-group">
+            <label>React Dashboard Port:</label>
+            <input type="number" id="settings-react-port" value="3000" min="1" max="65535">
+          </div>
+          <div class="settings-group">
+            <label>Loop Delay (seconds):</label>
+            <input type="number" id="settings-loop-delay" value="3.0" step="0.1">
+          </div>
+          <div class="settings-group">
+            <label>Buffer Max Length:</label>
+            <input type="number" id="settings-buffer-max" value="100" min="1">
+          </div>
+          <div class="settings-group">
+            <label>Heartbeat Interval (seconds):</label>
+            <input type="number" id="settings-heartbeat" value="15" min="1">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-modal-footer">
+      <button id="settings-save-btn" class="settings-save-btn">Save Settings</button>
+      <button id="settings-reset-btn" class="settings-reset-btn">Reset to Defaults</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

@@ -1,6 +1,9 @@
 import MetaTrader5 as mt5
 import pandas as pd
 import logging
+import json
+import os
+from pathlib import Path
 from typing import Optional, Dict
 from datetime import datetime
 from .base_provider import BaseDataProvider
@@ -49,6 +52,23 @@ class MT5DataProvider(BaseDataProvider):
         self.login = config.get("login")
         self.password = config.get("password")
         self.server = config.get("server")
+        
+        # ── ITS Runtime Credentials bridge ──────────────────────────────
+        if not self.password:
+            try:
+                base_dir = Path(__file__).resolve().parent.parent
+                rt_path = base_dir / "runtime_credentials.json"
+                if rt_path.exists():
+                    with open(rt_path, "r") as f:
+                        rt_data = json.load(f)
+                        self.password = rt_data.get("password", "")
+                        # Optionally override login/server too
+                        self.login = rt_data.get("login", self.login)
+                        self.server = rt_data.get("server", self.server)
+            except Exception as e:
+                logger.warning(f"Could not load runtime_credentials.json: {e}")
+        # ─────────────────────────────────────────────────────────────────
+        
         self.lite_mode = config.get("lite_mode", False)
         self.config = config  # Store full config for access to utc_offset etc
         self._symbol_map = {}  # Cache for resolved symbols
