@@ -288,7 +288,7 @@ class LoginScreen:
     def _launch_dashboard(self, session: dict):
         """Destroy login + root, then open standalone dashboard window."""
         try:
-            from dashboard import DashboardApp
+            from its_dashboard import DashboardApp
             self._win.destroy()
             self._root.destroy()
             root2 = tk.Tk()
