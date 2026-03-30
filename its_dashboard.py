@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+import subprocess
 import tkinter as tk
 from tkinter import font as tkfont
 from datetime import datetime, timezone
@@ -334,12 +335,32 @@ class DashboardApp:
 
     def _engine_start(self):
         self._append_log("Engine START requested via dashboard.")
+        try:
+            subprocess.Popen(
+                ["cmd.exe", "/c", "SYSTEM_ON.bat"],
+                cwd=BASE_DIR,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
+            self._append_log("SYSTEM_ON.bat executed in background.")
+        except Exception as e:
+            self._append_log(f"Failed to start engine: {e}")
 
     def _engine_stop(self):
         self._append_log("Engine STOP requested via dashboard.")
+        try:
+            subprocess.Popen(
+                ["cmd.exe", "/c", "SYSTEM_OFF.bat"],
+                cwd=BASE_DIR,
+                creationflags=0x08000000
+            )
+            self._append_log("SYSTEM_OFF.bat executed in background.")
+        except Exception as e:
+            self._append_log(f"Failed to stop engine: {e}")
 
     def _engine_restart(self):
         self._append_log("Engine RESTART requested via dashboard.")
+        self._engine_stop()
+        self._root.after(1500, self._engine_start)
 
     # ── Scrollable canvas ─────────────────────────────────────────────────────
 
