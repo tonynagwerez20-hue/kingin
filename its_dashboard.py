@@ -336,10 +336,16 @@ class DashboardApp:
     def _engine_start(self):
         self._append_log("Engine START requested via dashboard.")
         try:
+            env = os.environ.copy()
+            # Force the batch script to use the exact python.exe we are currently using
+            py_exe = sys.executable.replace("pythonw.exe", "python.exe")
+            env["ITS_PYTHON_EXE"] = py_exe
+
             subprocess.Popen(
                 ["cmd.exe", "/c", "START_ALL.bat"],
                 cwd=BASE_DIR,
-                creationflags=0x08000000  # CREATE_NO_WINDOW
+                creationflags=0x08000000,  # CREATE_NO_WINDOW
+                env=env
             )
             self._append_log("START_ALL.bat executed in background.")
         except Exception as e:

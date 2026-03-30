@@ -2,7 +2,11 @@
 setlocal enabledelayedexpansion
 TITLE Institutional Trading System - ONE-CLICK START
 SET "PROJECT_DIR=%~dp0"
-SET "PYTHON_EXE=python"
+if defined ITS_PYTHON_EXE (
+    SET "PYTHON_EXE=%ITS_PYTHON_EXE%"
+) else (
+    SET "PYTHON_EXE=python"
+)
 SET "STREAMLIT_EXE=streamlit"
 SET "DASHBOARD_PY=%PROJECT_DIR%dashboard\dashboard_app.py"
 
