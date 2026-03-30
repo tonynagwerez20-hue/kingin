@@ -12,6 +12,7 @@ import os
 import sys
 import tkinter as tk
 from tkinter import font as tkfont
+import binascii
 
 # ── Path anchor so sibling modules resolve correctly ─────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -119,9 +120,9 @@ class LoginScreen:
         # Remember checkbox
         chk_row = tk.Frame(panel, bg=PANEL, pady=4)
         chk_row.pack(fill="x", padx=20)
-        self._remember_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(chk_row, text="Remember credentials (no password stored)",
-                       variable=self._remember_var,
+        self._save_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(chk_row, text="Save password (encrypted locally)",
+                       variable=self._save_var,
                        bg=PANEL, fg=SUBTEXT, selectcolor=PANEL,
                        activebackground=PANEL, activeforeground=TEXT,
                        font=f_status).pack(anchor="w")
@@ -154,7 +155,7 @@ class LoginScreen:
         # Bind Enter key
         self._win.bind("<Return>", lambda e: self._on_connect())
 
-    # ── Credential persistence ────────────────────────────────────────────────
+    # ── Credential persistence (DPAPI) ────────────────────────────────────────
 
     def _load_credentials(self):
         try:
@@ -163,15 +164,43 @@ class LoginScreen:
                     creds = json.load(f)
                 self._account_var.set(str(creds.get("login", "")))
                 self._server_var.set(creds.get("server", ""))
-                self._remember_var.set(creds.get("remember", True))
+                self._save_var.set(creds.get("save_password", False))
+                
+                # Decrypt password via DPAPI if present
+                enc_pw = creds.get("encrypted_password", "")
+                if enc_pw and self._save_var.get():
+                    try:
+                        import win32crypt
+                        raw_bytes = binascii.unhexlify(enc_pw)
+                        _, dec_bytes = win32crypt.CryptUnprotectData(raw_bytes, None, None, None, 0)
+                        self._password_var.set(dec_bytes.decode("utf-8"))
+                    except ImportError:
+                        pass # pywin32 not installed, can't decrypt
+                    except Exception:
+                        self._password_var.set("") # Decryption failed
+                        
         except Exception:
             pass
 
-    def _save_credentials(self, account: str, server: str):
+    def _save_credentials(self, account: str, password: str, server: str):
         try:
+            data = {"login": int(account), "server": server, "save_password": self._save_var.get()}
+            
+            # Encrypt password via DPAPI if user opted to save it
+            if self._save_var.get() and password:
+                try:
+                    import win32crypt
+                    enc_bytes = win32crypt.CryptProtectData(password.encode("utf-8"), "ITS_MT5_Creds", None, None, None, 0)
+                    data["encrypted_password"] = binascii.hexlify(enc_bytes).decode("ascii")
+                except ImportError:
+                    pass # Silently fail to save password if win32crypt is missing
+                except Exception:
+                    pass
+            else:
+                data["encrypted_password"] = ""
+                
             with open(CREDS_FILE, "w") as f:
-                json.dump({"login": int(account), "server": server,
-                           "remember": True}, f, indent=2)
+                json.dump(data, f, indent=2)
         except Exception:
             pass
 
@@ -224,8 +253,7 @@ class LoginScreen:
                 info = mt5.account_info()
                 session["balance"] = info.balance if info else 0.0
                 session["equity"]  = info.equity  if info else 0.0
-                if self._remember_var.get():
-                    self._save_credentials(account, server)
+                self._save_credentials(account, password, server)
                 self._write_runtime_creds(account_int, password, server)
                 self._set_status("Authenticated. Launching dashboard...", GREEN)
                 self._win.after(400, lambda: self._launch_dashboard(session))
