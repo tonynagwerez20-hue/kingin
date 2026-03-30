@@ -207,6 +207,55 @@ class ModularBootstrapper:
         logger.info(f"Starting Modular Main Loop (Delay: {self.loop_delay}s)...")
         symbol = self.config.get("trading", {}).get("symbol", "XAUUSD")
 
+        # ── Desktop Dashboard Sync Helper ────────────────────────────────────
+        def _sync_desktop_state():
+            if _state_exporter:
+                acc     = current_state.get("account", {})
+                market  = current_state.get("market",  {})
+                sigs    = current_state.get("signals", [])
+                last_sig = sigs[-1] if sigs else {}
+                price    = market.get("price", 0.0)
+                bias_raw = market.get("htf_bias", "NEUTRAL").upper()
+                layer_list = []
+                for lp in current_state.get("pipeline", []):
+                    layer_list.append({
+                        "name":   lp.get("name", ""),
+                        "passed": lp.get("status", False),
+                        "score":  lp.get("score",  0.0),
+                        "reason": lp.get("reason", ""),
+                    })
+                conf_score = sum(l["score"] for l in layer_list)
+                kz_name = ""
+                for lp in layer_list:
+                    if "Killzone" in lp["name"]:
+                        kz_name = lp.get("reason", "")[:28]
+                        break
+                _state_exporter.export({
+                    "timestamp":        datetime.now(timezone.utc).isoformat(),
+                    "symbol":           market.get("symbol", symbol),
+                    "bias":             bias_raw,
+                    "current_price":    price,
+                    "signal_action":    last_sig.get("action", "NONE"),
+                    "entry_price":      last_sig.get("price",  price),
+                    "stop_loss":        last_sig.get("sl",     0.0),
+                    "take_profit":      last_sig.get("tp",     0.0),
+                    "lot_size":         last_sig.get("lots",   0.01),
+                    "execution_type":   last_sig.get("execution_type", "MARKET"),
+                    "confluence_score": conf_score,
+                    "killzone_name":    kz_name,
+                    "session_time":     "",
+                    "rr_ratio":         "—",
+                    "layers":           layer_list,
+                    "last_trade":       last_sig,
+                    "account_equity":   acc.get("equity",   0.0),
+                    "account_balance":  acc.get("balance",  0.0),
+                    "floating_pnl":     acc.get("daily_pnl", 0.0),
+                    "open_trades_count":0,
+                    "open_positions":   [],
+                    "active_warnings":  [],
+                })
+        # ───────────────────────────────────────────────────────────────────
+
         # ── Initial state ──────────────────────────────────────────────────────
         dashboard = None
         _default_bal = self.config.get("trading", {}).get("default_account_balance", 0.0)
@@ -298,6 +347,7 @@ class ModularBootstrapper:
                         current_state["market"]["htf_bias"] = "STANDBY"
                         if dashboard:
                             dashboard.update(current_state)
+                        _sync_desktop_state()
                         time.sleep(1.0)  # Shorter pulse on standby for faster UI response
                         continue
 
@@ -316,6 +366,7 @@ class ModularBootstrapper:
                     if not market_snapshot["m5_candles"] or not market_snapshot["tick"]:
                         if dashboard:
                             dashboard.update(current_state)
+                        _sync_desktop_state()
                         time.sleep(self.loop_delay)
                         continue
 
@@ -389,6 +440,7 @@ class ModularBootstrapper:
                             logger.info(f"REGIME BLOCK: Market regime={current_regime} — suppressing signals")
                             if dashboard:
                                 dashboard.update(current_state)
+                            _sync_desktop_state()
                             time.sleep(self.loop_delay)
                             continue
 
@@ -577,51 +629,7 @@ class ModularBootstrapper:
                         dashboard.update(current_state)
 
                     # ── Write engine_state.json for tkinter desktop dashboard ─
-                    if _state_exporter:
-                        acc     = current_state.get("account", {})
-                        market  = current_state.get("market",  {})
-                        sigs    = current_state.get("signals", [])
-                        last_sig = sigs[-1] if sigs else {}
-                        price    = market.get("price", 0.0)
-                        bias_raw = market.get("htf_bias", "NEUTRAL").upper()
-                        layer_list = []
-                        for lp in current_state.get("pipeline", []):
-                            layer_list.append({
-                                "name":   lp.get("name", ""),
-                                "passed": lp.get("status", False),
-                                "score":  lp.get("score",  0.0),
-                                "reason": lp.get("reason", ""),
-                            })
-                        conf_score = sum(l["score"] for l in layer_list)
-                        kz_name = ""
-                        for lp in layer_list:
-                            if "Killzone" in lp["name"]:
-                                kz_name = lp.get("reason", "")[:28]
-                                break
-                        _state_exporter.export({
-                            "timestamp":        datetime.now(timezone.utc).isoformat(),
-                            "symbol":           market.get("symbol", symbol),
-                            "bias":             bias_raw,
-                            "current_price":    price,
-                            "signal_action":    last_sig.get("action", "NONE"),
-                            "entry_price":      last_sig.get("price",  price),
-                            "stop_loss":        last_sig.get("sl",     0.0),
-                            "take_profit":      last_sig.get("tp",     0.0),
-                            "lot_size":         last_sig.get("lots",   0.01),
-                            "execution_type":   last_sig.get("execution_type", "MARKET"),
-                            "confluence_score": conf_score,
-                            "killzone_name":    kz_name,
-                            "session_time":     "",
-                            "rr_ratio":         "—",
-                            "layers":           layer_list,
-                            "last_trade":       last_sig,
-                            "account_equity":   acc.get("equity",   0.0),
-                            "account_balance":  acc.get("balance",  0.0),
-                            "floating_pnl":     acc.get("daily_pnl", 0.0),
-                            "open_trades_count":0,
-                            "open_positions":   [],
-                            "active_warnings":  [],
-                        })
+                    _sync_desktop_state()
 
                     time.sleep(self.loop_delay)
 
