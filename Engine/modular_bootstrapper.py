@@ -247,11 +247,11 @@ class ModularBootstrapper:
                     "rr_ratio":         "—",
                     "layers":           layer_list,
                     "last_trade":       last_sig,
-                    "account_equity":   acc.get("equity",   0.0),
-                    "account_balance":  acc.get("balance",  0.0),
-                    "floating_pnl":     acc.get("daily_pnl", 0.0),
-                    "open_trades_count":0,
-                    "open_positions":   [],
+                    "account_equity":   acc.get("equity",    0.0),
+                    "account_balance":  acc.get("balance",   0.0),
+                    "floating_pnl":     acc.get("floating_pnl", 0.0),
+                    "open_trades_count":acc.get("total_positions", 0),
+                    "open_positions":   acc.get("positions",       []),
                     "active_warnings":  [],
                 })
         # ───────────────────────────────────────────────────────────────────
@@ -261,11 +261,14 @@ class ModularBootstrapper:
         _default_bal = self.config.get("trading", {}).get("default_account_balance", 0.0)
         current_state = {
             "account": {
-                "balance":        _default_bal,
-                "equity":         0.0,
-                "daily_pnl":      0.0,
-                "daily_loss_pct": 0.0,
-                "daily_loss":     0.0,
+                "balance":         _default_bal,
+                "equity":          0.0,
+                "floating_pnl":    0.0,
+                "daily_pnl":       0.0,
+                "daily_loss_pct":  0.0,
+                "daily_loss":      0.0,
+                "positions":       [],
+                "total_positions": 0,
             },
             "market": {
                 "symbol":        symbol,
@@ -292,11 +295,15 @@ class ModularBootstrapper:
         # ── Initial account sync ───────────────────────────────────────────────
         try:
             acc_info = self.data_provider.get_account_info()
-            current_state["account"]["balance"] = acc_info.get("balance", current_state["account"]["balance"])
-            current_state["account"]["equity"]  = acc_info.get("equity", 0.0)
+            current_state["account"]["balance"]         = acc_info.get("balance", current_state["account"]["balance"])
+            current_state["account"]["equity"]          = acc_info.get("equity", 0.0)
+            current_state["account"]["positions"]       = acc_info.get("positions", [])
+            current_state["account"]["total_positions"] = acc_info.get("total_positions", 0)
+            current_state["account"]["floating_pnl"]    = round(acc_info.get("equity", 0.0) - acc_info.get("balance", 0.0), 2)
+            
             self.last_balance_sync = time.time()
             login_id = acc_info.get("login", "Unknown")
-            logger.info(f"Initial Account Sync: ${current_state['account']['balance']:,.2f} (Account: {login_id})")
+            logger.info(f"Initial Account Sync: ${current_state['account']['balance']:,.2f} | Positions: {current_state['account']['total_positions']} (Account: {login_id})")
         except Exception as e:
             logger.error(f"Initial account sync failed: {e}")
 
@@ -612,12 +619,21 @@ class ModularBootstrapper:
                         try:
                             acc_info = self.data_provider.get_account_info()
                             balance  = acc_info.get("balance", 0.0)
+                            equity   = acc_info.get("equity", 0.0)
+                            pos      = acc_info.get("positions", [])
+                            total    = acc_info.get("total_positions", 0)
+                            
                             self.db.set_state("account_balance", balance)
                             self.db.set_state("balance_last_sync", time.time())
-                            current_state["account"]["balance"] = balance
-                            current_state["account"]["equity"]  = acc_info.get("equity", 0.0)
+                            
+                            current_state["account"]["balance"]         = balance
+                            current_state["account"]["equity"]          = equity
+                            current_state["account"]["positions"]       = pos
+                            current_state["account"]["total_positions"] = total
+                            current_state["account"]["floating_pnl"]    = round(equity - balance, 2)
+                            
                             self.last_balance_sync = time.time()
-                            logger.info(f"Account Balance Synced: ${balance:,.2f}")
+                            logger.info(f"Account Sync: Balance=${balance:,.2f} | Equity=${equity:,.2f} | Positions={total}")
                         except Exception as e:
                             logger.error(f"Failed to sync account balance: {e}")
 

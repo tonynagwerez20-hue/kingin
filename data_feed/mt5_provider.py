@@ -232,18 +232,41 @@ class MT5DataProvider(BaseDataProvider):
 
     def get_account_info(self) -> Dict:
         """
-        Fetch current account balance and equity.
+        Fetch current account balance, equity, and open positions.
         """
         acc = mt5.account_info()
         if acc is None:
             logger.warning("MT5 account_info() returned None. Check terminal connection.")
-            return {"balance": 0.0, "equity": 0.0}
+            return {"balance": 0.0, "equity": 0.0, "positions": [], "total_positions": 0}
+        
+        # ── Fetch live positions from MT5 ──────────────────────────────
+        positions = mt5.positions_get()
+        pos_list = []
+        if positions:
+            # Sort positions by time (newest first)
+            for p in positions:
+                # Map MT5 position to dashboard's expected format
+                pos_type = "BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL"
+                pos_list.append({
+                    "symbol":        p.symbol,
+                    "type":          pos_type,
+                    "lots":          p.volume,
+                    "open_price":    p.price_open,
+                    "current_price": p.price_current,
+                    "sl":            p.sl,
+                    "tp":            p.tp,
+                    "floating_pnl":  p.profit,
+                    "open_time":     datetime.fromtimestamp(p.time).isoformat(),
+                    "ticket":        p.ticket
+                })
         
         return {
-            "balance": acc.balance,
-            "equity": acc.equity,
-            "login": acc.login,
-            "server": acc.server
+            "balance":         acc.balance,
+            "equity":          acc.equity,
+            "login":           acc.login,
+            "server":          acc.server,
+            "positions":       pos_list,
+            "total_positions": len(pos_list)
         }
 
     def shutdown(self):

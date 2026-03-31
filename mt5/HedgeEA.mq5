@@ -99,6 +99,8 @@ string GetHistoryDealsJson(int days);
 void   CheckForOfflineSignals();
 void   CheckForForensicSignals();
 void   UpdateForensicDisplay();
+ENUM_ORDER_TYPE_FILLING GetFillingMode();
+
 
 //+------------------------------------------------------------------+
 //| Input Parameters                                                 |
@@ -440,7 +442,8 @@ void CheckHeartbeat()
          request.deviation   = SLIPPAGE_POINTS;
          request.magic       = MAGIC_NUMBER;
          request.comment     = TRADE_COMMENT;
-         request.type_filling = ORDER_FILLING_IOC;
+         request.type_filling = GetFillingMode();
+
 
          if(OrderSend(request, result) && result.retcode == TRADE_RETCODE_DONE)
             response = StringFormat("{\"status\":\"SUCCESS\",\"ticket\":%I64u,\"price\":%.5f}",
@@ -694,7 +697,8 @@ void ExecuteTrade(SignalData &signal)
       request.deviation   = SLIPPAGE_POINTS;
       request.magic       = MAGIC_NUMBER;
       request.comment     = StringFormat("%s_LIMIT", TRADE_COMMENT);
-      request.type_filling = ORDER_FILLING_IOC;
+      request.type_filling = GetFillingMode();
+
       LogInfo(StringFormat("[EXECUTE/LIMIT] %s %s %.2f lots @ %.5f  SL=%.5f",
                            signal.action, signal.symbol, request.volume, request.price, request.sl));
    }
@@ -710,7 +714,8 @@ void ExecuteTrade(SignalData &signal)
       request.deviation   = SLIPPAGE_POINTS;
       request.magic       = MAGIC_NUMBER;
       request.comment     = TRADE_COMMENT;
-      request.type_filling = ORDER_FILLING_IOC;
+      request.type_filling = GetFillingMode();
+
       LogInfo(StringFormat("[EXECUTE/MARKET] %s %s %.2f lots @ %.5f (Ask=%.5f Bid=%.5f) SL=%.5f",
                            signal.action, signal.symbol, request.volume, request.price, ask, bid, request.sl));
    }
@@ -765,7 +770,8 @@ void ClosePosition(SignalData &signal)
       req.deviation   = SLIPPAGE_POINTS;
       req.magic       = MAGIC_NUMBER;
       req.comment     = "Exit";
-      req.type_filling = ORDER_FILLING_IOC;
+      req.type_filling = GetFillingMode();
+
 
       if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE)
       {
@@ -1167,4 +1173,15 @@ void UpdateForensicDisplay()
    d += StringFormat("REASON: %s\n", g_forensic_reason);
    d += "==========================================";
    Comment(d);
+}
+
+//+------------------------------------------------------------------+
+//| GetFillingMode helper                                            |
+//+------------------------------------------------------------------+
+ENUM_ORDER_TYPE_FILLING GetFillingMode()
+{
+   long filling = SymbolInfoInteger(_Symbol, SYMBOL_FILLING_MODE);
+   if((filling & SYMBOL_FILLING_FOK) != 0) return ORDER_FILLING_FOK;
+   if((filling & SYMBOL_FILLING_IOC) != 0) return ORDER_FILLING_IOC;
+   return ORDER_FILLING_RETURN;
 }
