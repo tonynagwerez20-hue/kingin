@@ -114,6 +114,28 @@ const Dashboard = ({ sessionToken, onLogout }) => {
     setPanelToggle(prev => ({ ...prev, [panel]: !prev[panel] }));
   };
 
+  const handleStartEngine = async () => {
+    try {
+      const { invoke } = window.__TAURI__ || await import('@tauri-apps/api/core');
+      await invoke('start_engine');
+      // Optimistic upate
+      setOnline(true);
+    } catch (e) { console.warn('Start error:', e); }
+  };
+
+  const handleStopEngine = async () => {
+    try {
+      const { invoke } = window.__TAURI__ || await import('@tauri-apps/api/core');
+      await invoke('stop_engine');
+      setOnline(false);
+    } catch (e) { console.warn('Stop error:', e); }
+  };
+
+  const handleRestartEngine = async () => {
+    await handleStopEngine();
+    setTimeout(handleStartEngine, 1500);
+  };
+
   // Get data from engine state
   const state = engineState || {};
   const layers = state.layers || [];
@@ -152,9 +174,9 @@ const Dashboard = ({ sessionToken, onLogout }) => {
       {/* Engine control bar */}
       <div style={styles.controlBar}>
         <div style={styles.controlButtons}>
-          <button style={{...styles.controlBtn, borderColor: '#00e87a', color: '#00e87a'}}>START</button>
-          <button style={{...styles.controlBtn, borderColor: '#ff2d4e', color: '#ff2d4e'}}>STOP</button>
-          <button style={{...styles.controlBtn, borderColor: '#ffaa00', color: '#ffaa00'}}>RESTART</button>
+          <button onClick={handleStartEngine} style={{...styles.controlBtn, borderColor: '#00e87a', color: '#00e87a'}}>START</button>
+          <button onClick={handleStopEngine} style={{...styles.controlBtn, borderColor: '#ff2d4e', color: '#ff2d4e'}}>STOP</button>
+          <button onClick={handleRestartEngine} style={{...styles.controlBtn, borderColor: '#ffaa00', color: '#ffaa00'}}>RESTART</button>
         </div>
         <div style={styles.controlInfo}>
           <span>UpTime: {fmtTime(state.timestamp)}</span>

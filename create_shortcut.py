@@ -30,22 +30,27 @@ def create_shortcut():
         # Fallback to pyw.exe in Windows dir
         pythonw_exe = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "pyw.exe")
 
-    launcher    = os.path.join(BASE_DIR, "launcher.py")
+    # Target the Tauri executable instead of pythonw.exe + launcher.py
+    tauri_exe = os.path.join(BASE_DIR, "src-tauri", "target", "release", "institutional-trading-system.exe")
+    if not os.path.exists(tauri_exe):
+        print(f"[WARNING] Tauri executable not found at {tauri_exe}")
+        print("          Please run SETUP_TAURI.bat to build it!")
+        print("          Shortcut will point to it anyway.")
+
     icon_path   = os.path.join(BASE_DIR, "its_icon.ico")
     desktop     = os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Public"), "Desktop")
     lnk_path    = os.path.join(desktop, "Institutional Trading System.lnk")
 
     shell       = win32com.client.Dispatch("WScript.Shell")
     shortcut    = shell.CreateShortCut(lnk_path)
-    shortcut.Targetpath      = pythonw_exe
-    shortcut.Arguments       = f'"{launcher}"'
+    shortcut.Targetpath      = tauri_exe
     shortcut.WorkingDirectory = BASE_DIR
-    shortcut.IconLocation    = icon_path if os.path.exists(icon_path) else pythonw_exe
+    shortcut.IconLocation    = icon_path if os.path.exists(icon_path) else tauri_exe
     shortcut.Description     = "Institutional Trading System"
     shortcut.save()
 
     print(f"[OK] Shortcut created: {lnk_path}")
-    print(f"     Targets: {pythonw_exe} \"{launcher}\"")
+    print(f"     Targets: {tauri_exe}")
 
 
 if __name__ == "__main__":

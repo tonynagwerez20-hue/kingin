@@ -1,0 +1,18 @@
+{
+  "weights": {
+    "ob_strength": -0.06168772531083502,
+    "fvg_present": 0.9109914578588422,
+    "bos_aligned": 0,
+    "liquidity_swept": 0.9129858216188046,
+    "adr_pct": -0.2148143511115635,
+    "pips_to_liquidity": -0.5092571088550577,
+    "session": 0.04231659469262153,
+    "htf_bias": -0.00561095517283213
+  },
+  "threshold": 0.6842105263157894,
+  "min_score": -0.7490535457576669,
+  "max_score": 1.709541243615383,
+  "model_type": "weighted_average",
+  "win_rate": 0.6963309914129586,
+  "n_samples": 1281
+}
