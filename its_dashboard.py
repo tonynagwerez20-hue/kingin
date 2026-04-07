@@ -859,12 +859,20 @@ class DashboardApp:
     def _update_signal(self, s: dict):
         action = s.get("signal_action", "NONE").upper()
 
-        # Detect new signal
-        sig_key = (action, s.get("entry_price"), s.get("timestamp","")[:16])
-        if action not in ("NONE", "WAITING") and sig_key != self._last_signal_id:
-            self._last_signal_id = sig_key
-            self._signals_generated += 1
+        # Engine-side signal counter sync (preferred)
+        eng_count = s.get("signals_generated")
+        if eng_count is not None:
+            self._signals_generated = eng_count
             self._signals_var.set(f"Signals: {self._signals_generated}")
+        else:
+            # Client-side detection (fallback)
+            sig_key = (action, s.get("entry_price"), s.get("timestamp","")[:16])
+            if action not in ("NONE", "WAITING") and sig_key != self._last_signal_id:
+                self._last_signal_id = sig_key
+                self._signals_generated += 1
+                self._signals_var.set(f"Signals: {self._signals_generated}")
+
+        if action not in ("NONE", "WAITING"):
             self._last_sig_var.set(
                 f"Last: {action} @ {s.get('entry_price',0):.2f}"
             )

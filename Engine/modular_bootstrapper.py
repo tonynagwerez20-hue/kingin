@@ -123,6 +123,7 @@ class ModularBootstrapper:
 
         # Track sent signal IDs to prevent duplicate sends within the same session
         self._sent_signal_ids: set = set()
+        self._signals_count:   int = 0
 
     # ──────────────────────────────────────────────────────────────────────────
     # Config
@@ -230,17 +231,21 @@ class ModularBootstrapper:
                     if "Killzone" in lp["name"]:
                         kz_name = lp.get("reason", "")[:28]
                         break
+                # Get the most recent strategy signal, even if it wasn't a trade (e.g. WAIT)
+                # This ensures the dashboard doesn't look stuck on an old signal.
+                strat_sig = current_state.get("current_strategy_signal", {})
+                
                 _state_exporter.export({
                     "timestamp":        datetime.now(timezone.utc).isoformat(),
                     "symbol":           market.get("symbol", symbol),
                     "bias":             bias_raw,
                     "current_price":    price,
-                    "signal_action":    last_sig.get("action", "NONE"),
-                    "entry_price":      last_sig.get("price",  price),
-                    "stop_loss":        last_sig.get("sl",     0.0),
-                    "take_profit":      last_sig.get("tp",     0.0),
-                    "lot_size":         last_sig.get("lots",   0.01),
-                    "execution_type":   last_sig.get("execution_type", "MARKET"),
+                    "signal_action":    strat_sig.get("action", "NONE"),
+                    "entry_price":      strat_sig.get("price",  price),
+                    "stop_loss":        strat_sig.get("sl",     0.0),
+                    "take_profit":      strat_sig.get("tp",     0.0),
+                    "lot_size":         strat_sig.get("lots",   0.01),
+                    "execution_type":   strat_sig.get("execution_type", "MARKET"),
                     "confluence_score": conf_score,
                     "killzone_name":    kz_name,
                     "session_time":     "",
@@ -252,6 +257,7 @@ class ModularBootstrapper:
                     "floating_pnl":     acc.get("floating_pnl", 0.0),
                     "open_trades_count":acc.get("total_positions", 0),
                     "open_positions":   acc.get("positions",       []),
+                    "signals_generated":self._signals_count,
                     "active_warnings":  [],
                 })
         # ───────────────────────────────────────────────────────────────────
@@ -389,9 +395,14 @@ class ModularBootstrapper:
                     # Update pipeline status for dashboard
                     current_state["pipeline"] = []
                     for layer_res in filt_res.get("layer_results", []):
+                        status_raw = layer_res["result"]["status"]
+                        # Convert status string to boolean so dashboard correctly shows PASS/FAIL
+                        passed = True if str(status_raw).upper() in ("PASS", "TRUE", "TRADE_ALLOWED") else False
+                        
                         current_state["pipeline"].append({
                             "name":   layer_res["layer"],
-                            "status": layer_res["result"]["status"],
+                            "status": status_raw,
+                            "passed": passed,
                             "score":  layer_res["result"].get("score", 0.0),
                             "reason": layer_res["result"].get("reason", ""),
                             "bias":   layer_res["result"].get("bias", "neutral"),
@@ -454,7 +465,19 @@ class ModularBootstrapper:
                         # 4. Generate signals
                         for strategy in self.strategies:
                             signal = strategy.generate_signal(market_snapshot)
+                            
+                            # Track current strategy output (even if WAIT) for dashboard visibility
+                            # Map internal strategy direction to readable format
+                            current_state["current_strategy_signal"] = {
+                                "action": signal.get("action", "WAIT"),
+                                "price":  tick.get("ask", 0.0) if signal.get("direction") == "buy" else tick.get("bid", 0.0),
+                                "sl":     0.0,
+                                "tp":     0.0,
+                                "lots":   0.01,
+                            }
+                            
                             if signal.get("action") == "TRADE":
+                                self._signals_count += 1
 
                                 # ── FIX #4: HTF direction alignment gate ───────────────
                                 signal_direction = signal.get("direction", "").lower()

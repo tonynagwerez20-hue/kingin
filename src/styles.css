@@ -1,0 +1,127 @@
+/* styles.css - Institutional Trading System
+ * Plain CSS - No Tailwind
+ * Font: JetBrains Mono, Syne
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@700;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --background: #000000;
+  --panel: #0a0a0a;
+  --border: #1a1a1a;
+  --accent: #00c8f0;
+  --green: #00e87a;
+  --red: #ff2d4e;
+  --amber: #ffaa00;
+  --text: #e8f0f8;
+  --subtext: #445566;
+  --white: #e8f0f8;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Input focus */
+input:focus, button:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Button hover */
+button:hover {
+  box-shadow: 0 0 12px rgba(0, 200, 240, 0.3);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 4px var(--accent); }
+  50% { box-shadow: 0 0 16px var(--accent); }
+}
+
+.status-live {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.all-pass {
+  animation: glow 1s ease-in-out infinite;
+}
+
+/* Panel positioning */
+.panel {
+  position: absolute;
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.panel-green { border-top: 2px solid var(--green); }
+.panel-blue { border-top: 2px solid var(--accent); }
+.panel-amber { border-top: 2px solid var(--amber); }
+
+/* Table styling */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  font-weight: 500;
+  color: var(--subtext);
+  font-size: 10px;
+}
+
+/* Selection */
+::selection {
+  background: var(--accent);
+  color: var(--background);
+}
