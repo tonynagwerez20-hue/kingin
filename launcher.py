@@ -51,6 +51,7 @@ BOOT_LINES = [
     "Starting ZMQBridge connection to HedgeEA...",
     "Loading trading_params_lite.json...",
     "Attaching UltraLowAccountRiskRule...",
+    "Preparing MT5 authentication...",
     "Dashboard ready — launching login screen...",
 ]
 

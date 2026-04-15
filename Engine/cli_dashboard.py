@@ -111,6 +111,9 @@ class CLIDashboard:
         table.add_row("Equity",      f"${equity:,.2f}")
         table.add_row("Daily P&L",   Text(f"${daily_pnl:+.2f}", style=pnl_style))
         table.add_row("Daily Loss %", f"{loss_pct:.2f}%")
+        
+        risk_tier = data.get("risk_tier", "Standard")
+        table.add_row("Risk Tier",   Text(risk_tier, style="bold yellow"))
 
         return Panel(table, title="[bold]Account Metrics[/]", border_style="cyan")
 
@@ -293,8 +296,13 @@ class CLIDashboard:
           state["market"]["htf_bias"]   — structural bias from structure layer
           state["news_events"]          — list of today's event dicts from NewsEventLayer
         """
+        # Extract risk_tier from global state for the account panel
+        acc_data = state.get("account", {}).copy()
+        if "risk_tier" in state:
+            acc_data["risk_tier"] = state["risk_tier"]
+
         self.layout["header"].update(self.make_header(state))
-        self.layout["account"].update(self.make_account_panel(state.get("account", {})))
+        self.layout["account"].update(self.make_account_panel(acc_data))
         self.layout["market"].update(self.make_market_panel(state.get("market",  {})))
         self.layout["pipeline"].update(self.make_pipeline_panel(state.get("pipeline", [])))
         self.layout["signals"].update(self.make_signals_panel(state.get("signals", [])))

@@ -37,3 +37,9 @@ If you want to use a specific account regardless of what is open, update `config
 ## 📜 Maintenance
 - **Logs**: Monitor `storage/logs/server_live.log` for execution errors.
 - **Master Switch**: Toggles are found in `SYSTEM_ON.bat` and `SYSTEM_OFF.bat`.
+
+## 📦 Deploying to a New Machine
+If you are taking this code to a completely new laptop, desktop, or VPS, follow this exact sequence to re-bootstrap the entire stack:
+1. **Python Dependencies**: Run `install.bat` once to grab `pywin32`, `zmq`, `MetaTrader5`, etc.
+2. **Native Compilers**: Right-click `INSTALL_CPP_TOOLS_ADMIN.ps1` and select **Run with PowerShell** (you must click **Run As Administrator** if prompted). This will silently download the ~2GB Visual Studio C++ Compiler needed for the desktop UI.
+3. **Build Target**: Finally, run `SETUP_TAURI.bat`. It will automatically rebuild the React frontend, link the native Windows application, and construct your `.exe` and Desktop icon!

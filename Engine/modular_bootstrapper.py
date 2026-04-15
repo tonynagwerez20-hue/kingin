@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+from collections import deque
 from contextlib import nullcontext
 
 # ── Ensure Engine/ directory is on sys.path so zmq_bridge resolves correctly ─
@@ -122,12 +123,24 @@ class ModularBootstrapper:
             )
 
         # Track sent signal IDs to prevent duplicate sends within the same session
-        self._sent_signal_ids: set = set()
-        self._signals_count:   int = 0
+        self._sent_signal_ids: set   = set()
+        self._signals_count:   int   = 0
+        self._dashboard_logs:  deque = deque(maxlen=50) # Keep last 50 events
 
     # ──────────────────────────────────────────────────────────────────────────
     # Config
     # ──────────────────────────────────────────────────────────────────────────
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Internal Handlers
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def emit_dashboard_msg(self, msg: str):
+        """Adds a message to the dashboard log buffer."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        self._dashboard_logs.append(f"[{ts}] {msg}")
+        # Also log to standard logger
+        logger.debug(f"[DASHBOARD] {msg}")
 
     def _load_json_config(self) -> Dict:
         """Reads the JSON configuration file."""
@@ -146,6 +159,7 @@ class ModularBootstrapper:
     def build_pipeline(self):
         """
         Builds the entire trading pipeline dynamically using the Registry.
+        Supports both the standard 'v6' and simplified 'Lite' configuration formats.
         """
         logger.info("[VERIFICATION] Building modular pipeline v6.1 (Latest)...")
         pipeline_cfg = self.config.get("pipeline", {})
@@ -173,28 +187,81 @@ class ModularBootstrapper:
 
         # 2. Load Filtration Layers
         layers_cfg = pipeline_cfg.get("filtration_layers", [])
+        
+        # --- LITE CONFIG SUPPORT ---
+        # If 'pipeline' key is missing, look for simpler 'layers' and 'filters' keys
+        if not layers_cfg and ("layers" in self.config or "filters" in self.config):
+            logger.info("[BOOTSTRAP] Mapping 'Lite' configuration to modular pipeline...")
+            lite_layers = self.config.get("layers", {})
+            
+            # Lookup table for shorthand names -> full class paths (SMC Gold Edition)
+            layer_map = {
+                "KillzoneFilterLayer":      "Engine.igof.layers.smc.killzone.KillzoneFilterLayer",
+                "MechanicalStructureLayer": "Engine.igof.layers.smc.structure.MechanicalStructureLayer",
+                "LiquiditySweepLayer":      "Engine.igof.layers.smc.liquidity.LiquiditySweepLayer",
+                "DisplacementLayer":        "Engine.igof.layers.smc.displacement.DisplacementLayer",
+                "FVGDiscountLayer":         "Engine.igof.layers.smc.fvg.FVGDiscountLayer",
+                "MicroMSSLayer":            "Engine.igof.layers.smc.mss.MicroMSSLayer",
+                "NewsEventLayer":           "Engine.igof.layers.smc.news_layer.NewsEventLayer",
+            }
+
+            for name, enabled in lite_layers.items():
+                if enabled and name in layer_map:
+                    layers_cfg.append({
+                        "class_path": layer_map[name],
+                        "config": self.config.get("filters", {})
+                    })
+
         loaded_layers = []
         for l_cfg in layers_cfg:
-            layer = ComponentRegistry.load_component(l_cfg["class_path"], config=l_cfg.get("config"))
-            loaded_layers.append(layer)
+            try:
+                layer = ComponentRegistry.load_component(l_cfg["class_path"], config=l_cfg.get("config"))
+                loaded_layers.append(layer)
+            except Exception as le:
+                logger.warning(f"Failed to load layer {l_cfg.get('class_path')}: {le}")
 
         self.filtration_engine = IGOFEngine(layers=loaded_layers)
 
         # 3. Load Strategies
         strat_cfg = pipeline_cfg.get("strategies", [])
+        
+        # --- LITE CONFIG SUPPORT ---
+        if not strat_cfg:
+            # Always ensure at least one strategy is active
+            logger.info("[BOOTSTRAP] No strategy configured. Defaulting to SMCStrategy.")
+            strat_cfg = [{
+                "class_path": "support.strategies.smc_strategy.SMCStrategy",
+                "config": self.config.get("trading", {})
+            }]
+
         self.strategies = []
         for s_cfg in strat_cfg:
-            strategy = ComponentRegistry.load_component(s_cfg["class_path"], config=s_cfg.get("config"))
-            self.strategies.append(strategy)
+            try:
+                strategy = ComponentRegistry.load_component(s_cfg["class_path"], config=s_cfg.get("config"))
+                self.strategies.append(strategy)
+            except Exception as se:
+                logger.warning(f"Failed to load strategy {s_cfg.get('class_path')}: {se}")
 
         # 4. Load Risk Rules
         risk_cfg = pipeline_cfg.get("risk_rules", [])
+        
+        # --- LITE CONFIG SUPPORT ---
+        if not risk_cfg:
+             logger.info("[BOOTSTRAP] Using default UltraLowAccountRiskRule for capital preservation.")
+             risk_cfg = [{
+                 "class_path": "support.risk.ultra_low_risk.UltraLowAccountRiskRule",
+                 "config": self.config.get("trading", {})
+             }]
+
         self.risk_rules = []
         for r_cfg in risk_cfg:
-            rule = ComponentRegistry.load_component(r_cfg["class_path"], config=r_cfg.get("config"))
-            self.risk_rules.append(rule)
+            try:
+                rule = ComponentRegistry.load_component(r_cfg["class_path"], config=r_cfg.get("config"))
+                self.risk_rules.append(rule)
+            except Exception as re:
+                logger.warning(f"Failed to load risk rule {r_cfg.get('class_path')}: {re}")
 
-        logger.info("Pipeline built successfully.")
+        logger.info(f"Pipeline built successfully: {len(self.filtration_engine.layers)} layers, {len(self.strategies)} strategies.")
 
     # ──────────────────────────────────────────────────────────────────────────
     # Main loop
@@ -235,6 +302,13 @@ class ModularBootstrapper:
                 # This ensures the dashboard doesn't look stuck on an old signal.
                 strat_sig = current_state.get("current_strategy_signal", {})
                 
+                # Determine current Risk Tier from UltraLowAccountRiskRule
+                risk_tier = "Standard"
+                for rule in self.risk_rules:
+                    if hasattr(rule, "get_risk_tier"):
+                        risk_tier = rule.get_risk_tier(acc.get("equity", 0.0))
+                        break
+
                 _state_exporter.export({
                     "timestamp":        datetime.now(timezone.utc).isoformat(),
                     "symbol":           market.get("symbol", symbol),
@@ -258,6 +332,8 @@ class ModularBootstrapper:
                     "open_trades_count":acc.get("total_positions", 0),
                     "open_positions":   acc.get("positions",       []),
                     "signals_generated":self._signals_count,
+                    "pipeline_logs":    list(self._dashboard_logs),
+                    "risk_tier":        risk_tier,
                     "active_warnings":  [],
                 })
         # ───────────────────────────────────────────────────────────────────
@@ -292,7 +368,8 @@ class ModularBootstrapper:
         }
 
         # ── CLI Dashboard ──────────────────────────────────────────────────────
-        if self.config.get("performance", {}).get("enable_cli_dashboard", True):
+        # ── CLI Dashboard (Deactivated as per user request — GUI only) ─────────
+        if False: # self.config.get("performance", {}).get("enable_cli_dashboard", True):
             from Engine.cli_dashboard import CLIDashboard
             from rich.live import Live
             dashboard = CLIDashboard()
@@ -343,6 +420,8 @@ class ModularBootstrapper:
             ctx = Live(dashboard.layout, refresh_per_second=4) if dashboard else nullcontext()
             with ctx:
                 while True:
+                    # ── FIX: Initialize signal variable at start of loop to avoid UnboundLocalError ──
+                    signal = {"action": "WAIT"}
 
                     # 1. Check Master Switch (fast responsiveness)
                     try:
@@ -391,6 +470,7 @@ class ModularBootstrapper:
 
                     # 3. Run IGOF filtration
                     filt_res = self.filtration_engine.process_all_layers(market_snapshot)
+                    self.emit_dashboard_msg(f"IGOF Filtration: {filt_res['action']} - Score: {filt_res.get('total_score',0):.1f}")
 
                     # Update pipeline status for dashboard
                     current_state["pipeline"] = []
@@ -407,176 +487,171 @@ class ModularBootstrapper:
                             "reason": layer_res["result"].get("reason", ""),
                             "bias":   layer_res["result"].get("bias", "neutral"),
                         })
+                        if not passed:
+                            self.emit_dashboard_msg(f"  [-] {layer_res['layer']} BLOCKED: {layer_res['result'].get('reason')}")
 
-                    if filt_res["action"] == "TRADE_ALLOWED":
+                    # ── Extract HTF structural bias and regime context (ALWAYS EXTRACT for UI) ────
+                    htf_bias          = "neutral"
+                    news_scalp_signal = None
+                    for layer_res in filt_res.get("layer_results", []):
+                        layer_name   = layer_res.get("layer", "")
+                        layer_result = layer_res.get("result", {})
+                        if "Structure" in layer_name and "bias" in layer_result:
+                            htf_bias = layer_result["bias"]
+                        if "News" in layer_name and layer_result.get("scalp_signal"):
+                            news_scalp_signal = layer_result["scalp_signal"]
 
-                        # ── Extract HTF structural bias and news scalp signal ───────────
-                        htf_bias          = "neutral"
-                        news_scalp_signal = None
-                        for layer_res in filt_res.get("layer_results", []):
-                            layer_name   = layer_res.get("layer", "")
-                            layer_result = layer_res.get("result", {})
-                            if "Structure" in layer_name and "bias" in layer_result:
-                                htf_bias = layer_result["bias"]
-                            if "News" in layer_name and layer_result.get("scalp_signal"):
-                                news_scalp_signal = layer_result["scalp_signal"]
+                    current_state["market"]["htf_bias"] = htf_bias.upper()
+                    current_state["market"]["h1_bias"]  = htf_bias.upper()
+                    current_state["market"]["h4_bias"]  = htf_bias.upper()
 
-                        current_state["market"]["htf_bias"] = htf_bias.upper()
-                        current_state["market"]["h1_bias"]  = htf_bias.upper()
-                        current_state["market"]["h4_bias"]  = htf_bias.upper()
+                    # ── Regime from RiskManager ────────────────────────────────────
+                    current_regime = self.risk_manager.state.get("current_regime", "STABLE")
+                    current_state["market"]["regime"] = current_regime
 
-                        # ── Regime from RiskManager ────────────────────────────────────
-                        current_regime = self.risk_manager.state.get("current_regime", "STABLE")
-                        current_state["market"]["regime"] = current_regime
+                    # ── News calendar ──
+                    for fl in self.filtration_engine.layers:
+                        if "News" in fl.__class__.__name__:
+                            if hasattr(fl, "get_todays_events"):
+                                todays = fl.get_todays_events()
+                                current_state["news_events"] = todays
+                                now_utc = datetime.now(timezone.utc)
+                                for ev in todays:
+                                    try:
+                                        et = datetime.fromisoformat(ev["time_utc"]).astimezone(timezone.utc)
+                                        if et > now_utc and ev.get("impact", 0) >= 2:
+                                            current_state["market"]["next_event"] = (
+                                                et.strftime("%H:%M ") + ev.get("title", "")[:18]
+                                            )
+                                            break
+                                    except Exception: pass
+                            break
 
-                        # ── News calendar from NewsEventLayer ──────────────────────────
-                        for layer_res in filt_res.get("layer_results", []):
-                            if "News" in layer_res.get("layer", ""):
-                                news_layer_obj = None
-                                for fl in self.filtration_engine.layers:
-                                    if "News" in fl.__class__.__name__:
-                                        news_layer_obj = fl
-                                        break
-                                if news_layer_obj and hasattr(news_layer_obj, "get_todays_events"):
-                                    todays = news_layer_obj.get_todays_events()
-                                    current_state["news_events"] = todays
-                                    now_utc = datetime.now(timezone.utc)
-                                    for ev in todays:
-                                        try:
-                                            et = datetime.fromisoformat(ev["time_utc"]).astimezone(timezone.utc)
-                                            if et > now_utc and ev.get("impact", 0) >= 2:
-                                                current_state["market"]["next_event"] = (
-                                                    et.strftime("%H:%M ") + ev.get("title", "")[:18]
-                                                )
-                                                break
-                                        except Exception:
-                                            pass
+                    # 4. Generate Strategy Signal (ALWAYS UPDATE for UI visibility)
+                    for strategy in self.strategies:
+                        sig = strategy.generate_signal(market_snapshot)
+                        current_state["current_strategy_signal"] = {
+                            "action": sig.get("action", "WAIT"),
+                            "price":  tick.get("ask", 0.0) if sig.get("direction") == "buy" else tick.get("bid", 0.0),
+                            "sl":     sig.get("sl", 0.0),
+                            "tp":     sig.get("tp", 0.0),
+                            "lots":   sig.get("lots", 0.01),
+                            "execution_type": sig.get("execution_type", "MARKET")
+                        }
+                        # We only treat it as "active" for the loop below if action is TRADE
+                        signal = sig 
+
+                    # 5. Filtration Action Gate
+                    if filt_res["action"] != "TRADE_ALLOWED":
+                        if dashboard: dashboard.update(current_state)
+                        _sync_desktop_state()
+                        time.sleep(self.loop_delay)
+                        continue
+
+                    if signal.get("action") == "TRADE":
+                        self._signals_count += 1
+                        self.emit_dashboard_msg(f"STRATEGY TRIGGER: {signal.get('direction','N/A').upper()} @ {tick.get('ask' if signal.get('direction')=='buy' else 'bid', 0.0):.2f}")
+
+                        # ── FIX #4: HTF direction alignment gate ───────────────
+                        signal_direction = signal.get("direction", "").lower()
+                        if signal_direction == "buy":
+                            mapped_direction = "bullish"
+                        elif signal_direction == "sell":
+                            mapped_direction = "bearish"
+                        else:
+                            mapped_direction = signal_direction
+
+                        if htf_bias != "neutral" and mapped_direction:
+                            if mapped_direction != htf_bias.lower():
+                                logger.info(
+                                    f"DIRECTION VETO: Signal={signal_direction.upper()} "
+                                    f"conflicts with HTF bias={htf_bias.upper()} — skipped"
+                                )
+                                continue  # skip to next strategy; do not send to risk
+
+                        # ── FIX #3: Inject live account context ───────────────
+                        signal["current_equity"]       = (
+                            current_state["account"].get("equity")
+                            or current_state["account"].get("balance", 0.0)
+                        )
+                        signal["balance"]              = current_state["account"].get("balance", 0.0)
+                        signal["daily_loss"]           = current_state["account"].get("daily_loss", 0.0)
+                        signal["daily_start_balance"]  = current_state["account"].get("balance", 0.0)
+                        signal["open_positions_count"] = len([
+                            s for s in current_state.get("signals", [])
+                            if s.get("action") == "TRADE"
+                        ])
+
+                        # 5. Check risk rules
+                        all_risk_passed = True
+                        for rule in self.risk_rules:
+                            risk_res = rule.check_risk(signal)
+                            if not risk_res.get("allowed", False):
+                                logger.info(f"Trade denied by risk rule: {rule.__class__.__name__}")
+                                all_risk_passed = False
                                 break
 
-                        # ── FIX #5: Regime gate — block VOLATILE / RANGING ─────────────
-                        if current_regime in ("VOLATILE", "RANGING"):
-                            logger.info(f"REGIME BLOCK: Market regime={current_regime} — suppressing signals")
-                            if dashboard:
-                                dashboard.update(current_state)
-                            _sync_desktop_state()
-                            time.sleep(self.loop_delay)
-                            continue
+                        if all_risk_passed:
+                            # Enrich signal to full MT5-EA-compatible format
+                            ea_signal = self._enrich_signal(
+                                signal, tick, htf_bias,
+                                risk_res=risk_res if "risk_res" in dir() else None,
+                                symbol=symbol,
+                            )
+                            ea_signal["time"] = datetime.now().strftime("%H:%M:%S")
 
-                        # 4. Generate signals
-                        for strategy in self.strategies:
-                            signal = strategy.generate_signal(market_snapshot)
-                            
-                            # Track current strategy output (even if WAIT) for dashboard visibility
-                            # Map internal strategy direction to readable format
-                            current_state["current_strategy_signal"] = {
-                                "action": signal.get("action", "WAIT"),
-                                "price":  tick.get("ask", 0.0) if signal.get("direction") == "buy" else tick.get("bid", 0.0),
-                                "sl":     0.0,
-                                "tp":     0.0,
-                                "lots":   0.01,
-                            }
-                            
-                            if signal.get("action") == "TRADE":
-                                self._signals_count += 1
+                            # ── Dry-run pipeline log ──────────────────
+                            logger.info(
+                                f"[PIPELINE] Signal enriched: "
+                                f"action={ea_signal['action']}  "
+                                f"symbol={ea_signal.get('symbol')}  "
+                                f"price={ea_signal.get('price')}  "
+                                f"sl={ea_signal.get('sl')}  "
+                                f"lots={ea_signal.get('lots')}  "
+                                f"exec={ea_signal.get('execution_type','MARKET')}"
+                            )
 
-                                # ── FIX #4: HTF direction alignment gate ───────────────
-                                signal_direction = signal.get("direction", "").lower()
-                                if signal_direction == "buy":
-                                    mapped_direction = "bullish"
-                                elif signal_direction == "sell":
-                                    mapped_direction = "bearish"
-                                else:
-                                    mapped_direction = signal_direction
-
-                                if htf_bias != "neutral" and mapped_direction:
-                                    if mapped_direction != htf_bias.lower():
-                                        logger.info(
-                                            f"DIRECTION VETO: Signal={signal_direction.upper()} "
-                                            f"conflicts with HTF bias={htf_bias.upper()} — skipped"
-                                        )
-                                        continue  # skip to next strategy; do not send to risk
-
-                                # ── FIX #3: Inject live account context ───────────────
-                                signal["current_equity"]       = (
-                                    current_state["account"].get("equity")
-                                    or current_state["account"].get("balance", 0.0)
-                                )
-                                signal["balance"]              = current_state["account"].get("balance", 0.0)
-                                signal["daily_loss"]           = current_state["account"].get("daily_loss", 0.0)
-                                signal["daily_start_balance"]  = current_state["account"].get("balance", 0.0)
-                                signal["open_positions_count"] = len([
-                                    s for s in current_state.get("signals", [])
-                                    if s.get("action") == "TRADE"
-                                ])
-
-                                # 5. Check risk rules
-                                all_risk_passed = True
-                                for rule in self.risk_rules:
-                                    risk_res = rule.check_risk(signal)
-                                    if not risk_res.get("allowed", False):
-                                        logger.info(f"Trade denied by risk rule: {rule.__class__.__name__}")
-                                        all_risk_passed = False
-                                        break
-
-                                if all_risk_passed:
-                                    # Enrich signal to full MT5-EA-compatible format
-                                    ea_signal = self._enrich_signal(
-                                        signal, tick, htf_bias,
-                                        risk_res=risk_res if "risk_res" in dir() else None,
-                                        symbol=symbol,
-                                    )
-                                    ea_signal["time"] = datetime.now().strftime("%H:%M:%S")
-
-                                    # ── Dry-run pipeline log ──────────────────
-                                    logger.info(
-                                        f"[PIPELINE] Signal enriched: "
-                                        f"action={ea_signal['action']}  "
-                                        f"symbol={ea_signal.get('symbol')}  "
-                                        f"price={ea_signal.get('price')}  "
-                                        f"sl={ea_signal.get('sl')}  "
-                                        f"lots={ea_signal.get('lots')}  "
-                                        f"exec={ea_signal.get('execution_type','MARKET')}"
-                                    )
-
-                                    # ── Send via ZMQ bridge (deduplicated) ────
-                                    sig_id = (
-                                        f"{ea_signal['action']}_"
-                                        f"{ea_signal.get('symbol')}_"
-                                        f"{ea_signal.get('price')}_"
-                                        f"{ea_signal.get('timestamp')}"
-                                    )
-                                    if sig_id not in self._sent_signal_ids:
-                                        if self.bridge and self.bridge.is_ready:
-                                            sent = self.bridge.send_signal(ea_signal)
-                                            if sent:
-                                                self._sent_signal_ids.add(sig_id)
-                                                # Keep the dedup set bounded
-                                                if len(self._sent_signal_ids) > 500:
-                                                    self._sent_signal_ids = set(
-                                                        list(self._sent_signal_ids)[-250:]
-                                                    )
-                                                logger.info(
-                                                    f"[PIPELINE] → Sent to HedgeEA: "
-                                                    f"action={ea_signal['action']} "
-                                                    f"@ {ea_signal.get('price')}"
-                                                )
-                                            else:
-                                                logger.warning(
-                                                    "[PIPELINE] Bridge send failed — "
-                                                    "check pyzmq install and EA connection"
-                                                )
-                                        else:
-                                            logger.error(
-                                                "[PIPELINE] Bridge not ready — signal dropped. "
-                                                "Run: pip install pyzmq"
+                            # ── Send via ZMQ bridge (deduplicated) ────
+                            sig_id = (
+                                f"{ea_signal['action']}_"
+                                f"{ea_signal.get('symbol')}_"
+                                f"{ea_signal.get('price')}_"
+                                f"{ea_signal.get('timestamp')}"
+                            )
+                            if sig_id not in self._sent_signal_ids:
+                                if self.bridge and self.bridge.is_ready:
+                                    sent = self.bridge.send_signal(ea_signal)
+                                    if sent:
+                                        self._sent_signal_ids.add(sig_id)
+                                        # Keep the dedup set bounded
+                                        if len(self._sent_signal_ids) > 500:
+                                            self._sent_signal_ids = set(
+                                                list(self._sent_signal_ids)[-250:]
                                             )
+                                        logger.info(
+                                            f"[PIPELINE] → Sent to HedgeEA: "
+                                            f"action={ea_signal['action']} "
+                                            f"@ {ea_signal.get('price')}"
+                                        )
+                                        self.emit_dashboard_msg(f"✓ SENT TO HEDGEEA: {ea_signal['action']} @ {ea_signal.get('price')}")
                                     else:
-                                        logger.debug(f"[PIPELINE] Duplicate signal suppressed: {sig_id}")
+                                        logger.warning(
+                                            "[PIPELINE] Bridge send failed — "
+                                            "check pyzmq install and EA connection"
+                                        )
+                                        self.emit_dashboard_msg("✗ ERROR: ZMQ Send Failed")
+                                else:
+                                    logger.error(
+                                        "[PIPELINE] Bridge not ready — signal dropped. "
+                                        "Run: pip install pyzmq"
+                                    )
+                            else:
+                                logger.debug(f"[PIPELINE] Duplicate signal suppressed: {sig_id}")
 
-                                    # Keep signals list bounded for dashboard (last 50)
-                                    current_state["signals"].append(ea_signal)
-                                    if len(current_state["signals"]) > 50:
-                                        current_state["signals"] = current_state["signals"][-50:]
+                                # Keep signals list bounded for dashboard (last 50)
+                                current_state["signals"].append(ea_signal)
+                                if len(current_state["signals"]) > 50:
+                                    current_state["signals"] = current_state["signals"][-50:]
 
                         # ── News scalp path (bypasses IGOF but not risk) ───────────────
                         if news_scalp_signal and self.config.get("pipeline", {}).get("enable_news_scalp", False):
@@ -607,28 +682,28 @@ class ModularBootstrapper:
                                     scalp_risk_ok = False
                                     break
                             if scalp_risk_ok:
-                                    ea_scalp = self._enrich_signal(
-                                        scalp, tick, htf_bias, symbol=symbol
-                                    )
-                                    ea_scalp["time"] = datetime.now().strftime("%H:%M:%S")
-                                    logger.info(
-                                        f"[NEWS SCALP] action={ea_scalp['action']} "
-                                        f"trigger={ea_scalp.get('trigger')} "
-                                        f"price={ea_scalp.get('price')}"
-                                    )
-                                    scalp_id = (
-                                        f"SCALP_{ea_scalp['action']}_"
-                                        f"{ea_scalp.get('price')}_"
-                                        f"{ea_scalp.get('timestamp')}"
-                                    )
-                                    if scalp_id not in self._sent_signal_ids:
-                                        if self.bridge and self.bridge.is_ready:
-                                            if self.bridge.send_signal(ea_scalp):
-                                                self._sent_signal_ids.add(scalp_id)
+                                ea_scalp = self._enrich_signal(
+                                    scalp, tick, htf_bias, symbol=symbol
+                                )
+                                ea_scalp["time"] = datetime.now().strftime("%H:%M:%S")
+                                logger.info(
+                                    f"[NEWS SCALP] action={ea_scalp['action']} "
+                                    f"trigger={ea_scalp.get('trigger')} "
+                                    f"price={ea_scalp.get('price')}"
+                                )
+                                scalp_id = (
+                                    f"SCALP_{ea_scalp['action']}_"
+                                    f"{ea_scalp.get('price')}_"
+                                    f"{ea_scalp.get('timestamp')}"
+                                )
+                                if scalp_id not in self._sent_signal_ids:
+                                    if self.bridge and self.bridge.is_ready:
+                                        if self.bridge.send_signal(ea_scalp):
+                                            self._sent_signal_ids.add(scalp_id)
 
-                                    current_state["signals"].append(ea_scalp)
-                                    if len(current_state["signals"]) > 50:
-                                        current_state["signals"] = current_state["signals"][-50:]
+                                current_state["signals"].append(ea_scalp)
+                                if len(current_state["signals"]) > 50:
+                                    current_state["signals"] = current_state["signals"][-50:]
 
                     else:
                         # Filtration blocked — reset bias/regime for dashboard

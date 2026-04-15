@@ -74,3 +74,4 @@ echo NOTE: Global Python 3.10 is the recommended stable path.
 echo       Avoid virtual environments if you experience crashes.
 echo ==========================================================
 pause
+ 

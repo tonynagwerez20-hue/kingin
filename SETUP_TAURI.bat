@@ -39,7 +39,20 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-echo Rust found:
+
+echo Setting Rust default toolchain to stable to prevent compilation errors...
+rustup default stable
+
+REM Check Microsoft C++ Build Tools (Linker)
+echo Checking for Windows C++ Build Tools...
+if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
+    echo [ERROR] Microsoft Desktop C++ Compiler is MISSING!
+    echo The native desktop application cannot be compiled without it.
+    echo Please right-click "INSTALL_CPP_TOOLS_ADMIN.ps1" and select "Run with PowerShell" as Administrator.
+    pause
+    exit /b 1
+)
+echo Rust and Windows Native Linker look ready!
 
 REM Install npm dependencies
 echo.

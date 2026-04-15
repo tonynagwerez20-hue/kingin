@@ -227,6 +227,7 @@ class DashboardApp:
         self._start_ts = time.time()
         self._pipeline_log: list[str] = []
         self._starting = False  # Track if engine is in boot phase
+        self._warn_labels: list[tk.Label] = []
 
 
         # MT5 availability
@@ -536,7 +537,57 @@ class DashboardApp:
 
         #  Panel 7  Active Warnings 
         p7 = FloatingPanel(C, "Active Warnings", 20, 500, 340, top_color=AMBER)
-        self._warn_frame = tk.Fra    def _poll_state(self):
+        self._warn_frame = tk.Frame(p7.body, bg=PANEL)
+        self._warn_frame.pack(fill="both", expand=True, padx=6, pady=6)
+        self._warn_labels: list[tk.Label] = []
+
+        #  Panel 8  Pipeline Log 
+        p8 = FloatingPanel(C, "Pipeline Log", 380, 500, 600, top_color=ACCENT)
+        log_frame = tk.Frame(p8.body, bg=PANEL)
+        log_frame.pack(fill="both", expand=True, padx=6, pady=6)
+        scrollbar = tk.Scrollbar(log_frame, bg=BORDER, troughcolor=PANEL)
+        scrollbar.pack(side="right", fill="y")
+        self._log_text = tk.Text(
+            log_frame, bg="#0a0a0a", fg=TEXT,
+            font=tkfont.Font(family=FONT, size=8),
+            wrap="word", state="disabled",
+            yscrollcommand=scrollbar.set
+        )
+        self._log_text.pack(fill="both", expand=True)
+        scrollbar.config(command=self._log_text.yview)
+
+        # Store panels for toggle bar
+        self._panels = [p1, p2, p3, p4, p5, p6, p7, p8]
+        self._panel_names = ["Bias", "Signal", "Last Trade", "Layers", "Account", "Trades", "Warnings", "Pipeline"]
+
+
+    def _build_toggle_bar(self):
+        bar = tk.Frame(self._root, bg=PANEL,
+                       highlightthickness=1, highlightbackground=BORDER)
+        bar.pack(fill="x", side="bottom")
+        self._toggle_btns = []
+        for i, name in enumerate(self._panel_names):
+            btn = tk.Button(
+                bar, text=name,
+                bg=ACCENT, fg="#000000",
+                font=tkfont.Font(family=FONT, size=8, weight="bold"),
+                relief="flat", cursor="hand2",
+                padx=10, pady=4,
+                command=lambda idx=i: self._toggle_panel(idx)
+            )
+            btn.pack(side="left", padx=3, pady=3)
+            self._toggle_btns.append(btn)
+
+    def _toggle_panel(self, idx: int):
+        visible = self._panels[idx].toggle_visibility()
+        self._toggle_btns[idx].config(
+            bg=ACCENT if visible else BORDER,
+            fg="#000000" if visible else SUBTEXT,
+        )
+
+    #  State polling (no threads  after() only) 
+
+    def _poll_state(self):
         state = None
         # Retry loop to handle Windows file lock race conditions
         for attempt in range(3):
@@ -593,35 +644,6 @@ class DashboardApp:
                 self._set_offline()
 
         self._root.after(self.POLL_MS, self._poll_state)
-
-
-    def _build_toggle_bar(self):
-        bar = tk.Frame(self._root, bg=PANEL,
-                       highlightthickness=1, highlightbackground=BORDER)
-        bar.pack(fill="x", side="bottom")
-        self._toggle_btns = []
-        for i, name in enumerate(self._panel_names):
-            btn = tk.Button(
-                bar, text=name,
-                bg=ACCENT, fg="#000000",
-                font=tkfont.Font(family=FONT, size=8, weight="bold"),
-                relief="flat", cursor="hand2",
-                padx=10, pady=4,
-                command=lambda idx=i: self._toggle_panel(idx)
-            )
-            btn.pack(side="left", padx=3, pady=3)
-            self._toggle_btns.append(btn)
-
-    def _toggle_panel(self, idx: int):
-        visible = self._panels[idx].toggle_visibility()
-        self._toggle_btns[idx].config(
-            bg=ACCENT if visible else BORDER,
-            fg="#000000" if visible else SUBTEXT,
-        )
-
-    #  State polling (no threads  after() only) 
-
-    def _poll_state(self):
         try:
             with open(STATE_FILE, "r", encoding="utf-8") as f:
                 state = json.load(f)
@@ -681,6 +703,7 @@ class DashboardApp:
         self._update_account(s)
         self._update_trades(s)
         self._update_warnings(s)
+        self._update_pipeline(s)
         self._update_uptime()
 
     def _update_header(self, s: dict):
@@ -813,6 +836,16 @@ class DashboardApp:
                                anchor="w", wraplength=300)
                 lbl.pack(anchor="w", fill="x")
                 self._warn_labels.append(lbl)
+
+    def _update_pipeline(self, s: dict):
+        pipeline_log = s.get("pipeline_log", [])
+        if pipeline_log:
+            self._log_text.config(state="normal")
+            self._log_text.delete("1.0", "end")
+            for line in pipeline_log[-200:]:  # Keep last 200 lines
+                self._log_text.insert("end", line + "\n")
+            self._log_text.see("end")
+            self._log_text.config(state="disabled")
 
     def _append_log(self, msg: str):
         ts  = datetime.now().strftime("%H:%M:%S")

@@ -7,7 +7,7 @@ edition = "2021"
 
 [lib]
 name = "institutional_trading_system_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

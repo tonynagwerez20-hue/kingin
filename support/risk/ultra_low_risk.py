@@ -22,34 +22,51 @@ class UltraLowAccountRiskRule(BaseRiskRule):
         self.profit_step = config.get("profit_step_for_scaling", 15.0) # Scale every $15
         self.risk_pct_per_trade = config.get("risk_pct_per_trade", 0.01) # 1% risk per trade
 
+    def get_risk_tier(self, equity: float) -> str:
+        """Categorizes the account based on SMC conservatism."""
+        if equity < 150:
+            return "Tier 1: Fragile" if equity < 50 else "Tier 2: Strategic"
+        elif equity < 300:
+            return "Tier 3: Stable"
+        elif equity < 500:
+            return "Tier 4: Conservative"
+        elif equity < 750:
+            return "Tier 5: Professional"
+        elif equity < 1000:
+            return "Tier 6: Standard"
+        else:
+            return "Tier 7: Institutional"
+
     def calculate_auto_lot_size(self, current_equity: float, seed_balance: float = None) -> float:
         """
-        AUTO-SIZING LOGIC:
-        - Increases lot size when in profit (above seed balance)
-        - Decreases lot size when in loss (below seed balance)
-        - Uses linear scaling between min and max lot sizes
+        CONSERVATIVE SMC AUTO-SIZING:
+        - $0  - $149: 0.01 lots
+        - $150- $299: 0.02 lots
+        - $300- $499: 0.03 lots
+        - $500- $749: 0.05 lots
+        - $750- $999: 0.07 lots
+        - $1000+    : 0.10 lots (and above)
         """
-        # Allow runtime override so the bootstrapper can pass the actual
-        # account opening balance instead of the config default.
-        effective_seed = seed_balance if seed_balance is not None else self.seed_balance
-        profit = current_equity - effective_seed
-        
-        if profit >= 0:
-            # In profit: scale up proportionally
-            # For every $5 profit, increase lot size
-            profit_steps = int(profit / self.profit_step)
-            # Scale factor: 1 step = 0.01 increase (from 0.01 to 0.02, etc.)
-            scaled_lot = self.min_lot_size + (profit_steps * 0.01)
+        e = current_equity
+        if e < 150:
+            lot = 0.01
+        elif e < 300:
+            lot = 0.02
+        elif e < 500:
+            lot = 0.03
+        elif e < 750:
+            lot = 0.05
+        elif e < 1000:
+            lot = 0.07
         else:
-            # In loss: scale down proportionally
-            # For every $2.5 loss below seed, decrease by 0.01
-            loss_steps = int(abs(profit) / 2.5)
-            scaled_lot = self.min_lot_size - (loss_steps * 0.01)
-        
+            # 0.10 lots per $1000 equity (classic SMC conservative)
+            lot = round((e / 1000.0) * 0.1, 2)
+            
         # Clamp to min/max bounds
-        final_lot = max(self.min_lot_size, min(self.max_lot_size, scaled_lot))
+        final_lot = max(self.min_lot_size, min(self.max_lot_size, lot))
         
-        logger.info(f"Auto-Sizing: Equity=${current_equity:.2f}, Profit=${profit:.2f}, Lot={final_lot:.3f}")
+        tier = self.get_risk_tier(e)
+        logger.info(f"SMC Risk Scale: Equity=${e:.2f}, {tier}, Allocated Lot={final_lot:.3f}")
         return final_lot
 
     def check_risk(self, trade_request: Dict) -> Dict:
@@ -113,11 +130,14 @@ class UltraLowAccountRiskRule(BaseRiskRule):
         signal_seed = trade_request.get("seed_balance", None)
         dynamic_lot_size = self.calculate_auto_lot_size(current_equity, seed_balance=signal_seed)
         trade_request["lots"] = dynamic_lot_size
+        
+        tier_name = self.get_risk_tier(current_equity)
 
         return {
             "allowed": True,
-            "reason": f"Safety checks passed. Auto-size: {dynamic_lot_size:.3f} lots, Positions: {dynamic_max_positions} allowed.",
+            "reason": f"Safety checks passed. {tier_name} -> {dynamic_lot_size:.2f} lots.",
             "enforced_lots": dynamic_lot_size,
+            "risk_tier": tier_name,
             "dynamic_limit": current_daily_loss_limit,
             "dynamic_max_positions": dynamic_max_positions
         }

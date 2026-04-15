@@ -68,8 +68,37 @@ class LoginScreen:
         self._win.lift()
         self._win.focus_force()
 
+        # Initialize MT5 in background thread
+        self._mt5_initialized = False
+        self._mt5_initializing = False
+        if MT5_AVAILABLE:
+            self._init_mt5_background()
+
         self._build_ui()
         self._load_credentials()
+
+    def _init_mt5_background(self):
+        """Initialize MT5 in background thread to avoid blocking UI."""
+        if self._mt5_initializing or self._mt5_initialized:
+            return
+
+        self._mt5_initializing = True
+
+        def init_worker():
+            try:
+                self._set_status("Initializing MT5 connection...", ACCENT)
+                mt5.initialize()
+                self._mt5_initialized = True
+                self._mt5_initializing = False
+                self._set_status("MT5 ready for authentication", GREEN)
+            except Exception as exc:
+                self._mt5_initializing = False
+                self._set_status(f"MT5 initialization failed: {exc}", RED)
+
+        # Start background initialization
+        import threading
+        thread = threading.Thread(target=init_worker, daemon=True)
+        thread.start()
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -151,6 +180,12 @@ class LoginScreen:
         if not MT5_AVAILABLE:
             self._status_var.set("⚠  DEMO MODE — MetaTrader5 not installed. Any credentials accepted.")
             self._status_lbl.config(fg=AMBER)
+        elif MT5_AVAILABLE and not self._mt5_initialized and not self._mt5_initializing:
+            self._status_var.set("Ready to connect. Click CONNECT & LAUNCH to begin authentication.")
+            self._status_lbl.config(fg=GREEN)
+        elif self._mt5_initializing:
+            self._status_var.set("Initializing MT5 connection in background...")
+            self._status_lbl.config(fg=ACCENT)
 
         # Bind Enter key
         self._win.bind("<Return>", lambda e: self._on_connect())
@@ -247,7 +282,18 @@ class LoginScreen:
 
         # Real MT5 login
         try:
-            mt5.initialize()
+            if not self._mt5_initialized:
+                if self._mt5_initializing:
+                    self._set_status("MT5 still initializing, please wait...", AMBER)
+                    self._connect_btn.config(state="normal")
+                    return
+                else:
+                    # Fallback: initialize now
+                    self._set_status("Initializing MT5...", ACCENT)
+                    mt5.initialize()
+                    self._mt5_initialized = True
+
+            self._set_status("Authenticating with MT5...", ACCENT)
             authorized = mt5.login(account_int, password=password, server=server)
             if authorized:
                 info = mt5.account_info()

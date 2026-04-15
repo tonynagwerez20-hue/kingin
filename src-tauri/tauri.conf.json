@@ -15,11 +15,13 @@
         "title": "Institutional Trading System",
         "width": 1024,
         "height": 600,
-        "minWidth": 1024,
-        "minHeight": 600,
+        "minWidth": 800,
+        "minHeight": 500,
         "resizable": true,
-        "fullscreen": true,
-        "center": true
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false
       }
     ],
     "security": {
@@ -33,7 +35,8 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/256x256.png",
-      "icons/app-icon.png"
+      "icons/app-icon.png",
+      "icons/icon.ico"
     ]
   }
 }
