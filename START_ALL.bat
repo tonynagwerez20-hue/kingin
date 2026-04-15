@@ -5,7 +5,19 @@ SET "PROJECT_DIR=%~dp0"
 if defined ITS_PYTHON_EXE (
     SET "PYTHON_EXE=%ITS_PYTHON_EXE%"
 ) else (
-    SET "PYTHON_EXE=python"
+    REM Auto-detect Python executable: prefer ITS_PYTHON_EXE, then PATH, then py launcher, fallback to 'python'
+    SET "PYTHON_EXE="
+    if defined ITS_PYTHON_EXE (
+        SET "PYTHON_EXE=%ITS_PYTHON_EXE%"
+    ) else (
+        for /f "delims=" %%P in ('where python 2^>nul') do @if not defined PYTHON_EXE set "PYTHON_EXE=%%~fP"
+        if not defined PYTHON_EXE (
+            for /f "delims=" %%P in ('where py 2^>nul') do @if not defined PYTHON_EXE set "PYTHON_EXE=%%~fP"
+        )
+        if not defined PYTHON_EXE (
+            SET "PYTHON_EXE=python"
+        )
+    )
 )
 SET "STREAMLIT_EXE=streamlit"
 SET "DASHBOARD_PY=%PROJECT_DIR%dashboard\dashboard_app.py"

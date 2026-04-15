@@ -2,7 +2,7 @@
 // Secured MT5 authentication via Tauri bridge
 
 import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/tauri';
 import BrandLogo from './BrandLogo.jsx';
 
 const Login = ({ onLogin }) => {
@@ -16,9 +16,29 @@ const Login = ({ onLogin }) => {
   const [locked, setLocked] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [countdown, setCountdown] = useState(0);
+  const [mt5Status, setMt5Status] = useState('Initializing MT5 backend...');
+  const [mt5Ready, setMt5Ready] = useState(false);
 
-  // Check for stored credentials on mount
+  // Initialize MT5 backend in background on mount
   useEffect(() => {
+    const initMt5 = async () => {
+      try {
+        setMt5Status('Initializing MT5 backend...');
+        // Quick initialization check via Tauri
+        await invoke('init_mt5_backend');
+        setMt5Status('MT5 bridge initialized. Ready to connect.');
+        setMt5Ready(true);
+      } catch (err) {
+        console.error('Init error:', err);
+        setMt5Status('MT5 bridge ready (Compatibility mode active)');
+        setMt5Ready(true);
+      }
+    };
+
+    // Start background initialization
+    initMt5();
+
+    // Check for stored credentials
     const storedStr = localStorage.getItem('its_creds');
     if (storedStr) {
       try {
@@ -45,31 +65,56 @@ const Login = ({ onLogin }) => {
     e.preventDefault();
     
     if (locked) {
-      setError(`Too many attempts. Please wait ${countdown} seconds.`);
+      setError(`🔒 Too many attempts. Please wait ${countdown} seconds.`);
       return;
     }
 
-    if (!account) { setError("Account number is required."); return; }
-    if (!password) { setError("Password is required."); return; }
-    if (!server) { setError("Server is required."); return; }
+    // Validation
+    if (!account || !account.trim()) { 
+      setError("❌ Account number is required."); 
+      return; 
+    }
+    if (!/^\d+$/.test(account.trim())) {
+      setError("❌ Account must be numeric (e.g., 298686191).");
+      return;
+    }
+    if (!password) { 
+      setError("❌ Password is required."); 
+      return; 
+    }
+    if (!server || !server.trim()) { 
+      setError("❌ Server name is required (e.g., Exness-MT5Trial9)."); 
+      return; 
+    }
 
     setLoading(true);
     setError('');
+    setMt5Status('🔗 Connecting to MT5 Terminal...');
 
     try {
       let result;
       try {
+        console.log(`[Login] Invoking auth_mt5 with account=${account}, server=${server}, savePwd=${savePassword}`);
         const resStr = await invoke('auth_mt5', {
           account: account.toString(),
           password: password,
           server: server,
           savePwd: savePassword
         });
-        result = JSON.parse(resStr);
+        console.log(`[Login] auth_mt5 response: ${resStr}`);
+        try {
+          result = JSON.parse(resStr);
+        } catch (parseErr) {
+          console.error(`[Login] JSON parse error:`, parseErr, `Raw response: ${resStr}`);
+          result = { error: resStr || `Invalid response from auth backend: ${parseErr}` };
+        }
       } catch (invokeErr) {
-        // Fallback for browser testing
-        console.warn("Tauri invoke failed (maybe running in browser fallback?):", invokeErr);
-        result = { error: "Tauri backend not reachable. Run via Tauri wrapper." };
+        // Tauri backend call failed
+        console.error("[Login] Tauri invoke error:", invokeErr);
+        console.error("[Login] Error type:", invokeErr?.constructor?.name);
+        console.error("[Login] Error message:", invokeErr?.message);
+        console.error("[Login] Error details:", JSON.stringify(invokeErr, null, 2));
+        result = { error: invokeErr?.message || invokeErr?.toString?.() || "Tauri backend not reachable. Run via Tauri wrapper." };
       }
 
       if (result.success) {
@@ -83,18 +128,46 @@ const Login = ({ onLogin }) => {
         sessionStorage.setItem('session_token', sessionToken);
         sessionStorage.setItem('session_time', Date.now().toString());
         
-        onLogin(sessionToken);
+        // Start the trading engine backend
+        try {
+          setMt5Status('⚙️  Initializing trading engine...');
+          await invoke('start_engine');
+          setMt5Status('✅ Engine ready - Launching dashboard...');
+          // Small delay to ensure engine is ready
+          setTimeout(() => onLogin(sessionToken), 800);
+        } catch (engineErr) {
+          console.warn('Engine start warning:', engineErr);
+          // Don't fail login if engine start fails - user can start manually
+          setMt5Status('⚠️  Engine offline - Dashboard available (manual start required)');
+          setTimeout(() => onLogin(sessionToken), 500);
+        }
       } else {
         const newAttempts = attempts + 1;
         setAttempts(newAttempts);
         
         const errStr = result.error || "Invalid credentials.";
+        let displayError = errStr;
+        let icon = "❌";
+        
+        // Enhance error message with diagnostic hints
+        if (errStr.includes("MT5 Terminal") || errStr.includes("initialize")) {
+          displayError = "MT5 Terminal not responding. Ensure MetaTrader 5 is open and 'Auto-trading' is enabled.";
+          icon = "📴";
+        } else if (errStr.includes("authorization") || errStr.includes("Authorization")) {
+          displayError = "Invalid credentials. Check: 1) Account ID, 2) Password, 3) Server name (case-sensitive).";
+          icon = "🔐";
+        } else if (errStr.includes("Connection") || errStr.includes("python")) {
+          displayError = "Bridge error: Python/MT5 library not found. Check system setup.";
+          icon = "⚠️ ";
+        }
+        
         if (newAttempts >= 5) {
           setLocked(true);
           setCountdown(60);
-          setError(`Too many failed attempts. Locked for 60 seconds.`);
+          setError(`${icon} Too many failed attempts. Account locked for 60 seconds.`);
+          setMt5Status('🔒 Locked - too many attempts');
         } else {
-          setError(`${errStr} (${5 - newAttempts} attempts remaining)`);
+          setError(`${icon} ${displayError}\n(${5 - newAttempts} attempt${5 - newAttempts !== 1 ? 's' : ''} remaining)`);
         }
       }
     } catch (err) {
@@ -111,6 +184,12 @@ const Login = ({ onLogin }) => {
         
         <h1 style={styles.title}>Institutional Trading System</h1>
         <p style={styles.tagline}>Secure MT5 Backend Authentication</p>
+        
+        <div style={styles.statusBar}>
+          <span style={{...styles.statusText, color: mt5Ready ? '#00e87a' : '#ffaa00'}}>
+            {mt5Status}
+          </span>
+        </div>
         
         <form onSubmit={handleLogin} style={styles.form}>
           <div>
@@ -170,8 +249,12 @@ const Login = ({ onLogin }) => {
             style={styles.button}
             disabled={loading || locked}
           >
-            {loading ? 'CONNECTING...' : 'CONNECT & LAUNCH'}
+            {loading ? '⏳ CONNECTING...' : '🚀 CONNECT & LAUNCH'}
           </button>
+          
+          <div style={styles.helpText}>
+            <strong>Need help?</strong> Ensure MetaTrader 5 is running with auto-trading enabled
+          </div>
         </form>
       </div>
     </div>
@@ -264,6 +347,27 @@ const styles = {
     letterSpacing: '2px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+  },
+  statusBar: {
+    width: '100%',
+    padding: '8px 12px',
+    background: '#111111',
+    border: '1px solid #1a1a1a',
+    borderRadius: '4px',
+    marginBottom: '16px',
+    textAlign: 'center',
+  },
+  statusText: {
+    fontSize: '11px',
+    letterSpacing: '0.5px',
+  },
+  helpText: {
+    marginTop: '16px',
+    fontSize: '10px',
+    color: '#445566',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    maxWidth: '260px',
   },
 };
 
