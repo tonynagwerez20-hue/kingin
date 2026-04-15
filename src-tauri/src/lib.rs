@@ -8,33 +8,64 @@ use tauri_plugin_shell::ShellExt;
 /// Read engine_state.json from executable directory
 #[tauri::command]
 pub fn read_engine_state() -> Result<String, String> {
-    // Get executable directory
-    let exe_path = std::env::current_exe()
-        .map_err(|e| format!("Failed to get executable path: {}", e))?;
-    
-    let exe_dir = exe_path.parent()
-        .ok_or_else(|| "Failed to get executable directory".to_string())?;
-    
-    // Navigate up to project root (exe is in src-tauri/target/release/)
-    let mut project_root = exe_dir.to_path_buf();
-    project_root.pop(); // release
-    project_root.pop(); // target  
-    project_root.pop(); // src-tauri
-    
-    let engine_state_path = project_root.join("engine_state.json");
-    
-    // Try current directory as fallback
-    let engine_state_path = if !engine_state_path.exists() {
-        PathBuf::from("engine_state.json")
-    } else {
-        engine_state_path
-    };
-    
-    // Read file
-    let content = fs::read_to_string(&engine_state_path)
-        .map_err(|e| format!("Failed to read engine_state.json: {}", e))?;
-    
-    Ok(content)
+    // Attempt to locate engine_state.json from several likely locations.
+    // Prefer an explicit env var `ITS_STATE_PATH` when present.
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 1) Env override
+    if let Ok(p) = std::env::var("ITS_STATE_PATH") {
+        candidates.push(PathBuf::from(p));
+    }
+
+    // 2) Relative to the executable (typical during development: src-tauri/target/release)
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // a) exe_dir/engine_state.json
+            candidates.push(exe_dir.join("engine_state.json"));
+
+            // b) exe_path with filename replaced
+            candidates.push(exe_path.with_file_name("engine_state.json"));
+
+            // c) Walk up 3 levels: release -> target -> src-tauri -> project root
+            let mut ancestor = exe_dir.to_path_buf();
+            if ancestor.pop() && ancestor.pop() && ancestor.pop() {
+                candidates.push(ancestor.join("engine_state.json"));
+            }
+        }
+    }
+
+    // 3) Current working directory
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("engine_state.json"));
+    }
+
+    // 4) As a last resort try the repository root relative path
+    candidates.push(PathBuf::from("engine_state.json"));
+
+    // Try each candidate: file must exist and contain valid JSON
+    for cand in candidates.iter() {
+        if !cand.exists() {
+            continue;
+        }
+
+        match fs::read_to_string(&cand) {
+            Ok(content) => {
+                // quick JSON validation to avoid returning binary/corrupt files
+                if serde_json::from_str::<serde_json::Value>(&content).is_ok() {
+                    return Ok(content);
+                } else {
+                    eprintln!("[read_engine_state] Found file but JSON parse failed: {}", cand.display());
+                    continue;
+                }
+            }
+            Err(e) => {
+                eprintln!("[read_engine_state] Failed to read {}: {}", cand.display(), e);
+                continue;
+            }
+        }
+    }
+
+    Err("engine_state.json not found or invalid JSON in known locations".to_string())
 }
 
 /// Write dashboard command to JSON file
