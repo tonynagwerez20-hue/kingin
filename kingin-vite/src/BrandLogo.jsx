@@ -1,5 +1,4 @@
-// BrandLogo.jsx - Institutional Trading System Logo
-// Renders the exact SVG logo as specified in the system prompt
+// BrandLogo.jsx - KingIn brand logo (hexagon with trading chart elements)
 
 const BrandLogo = ({ size = 48 }) => {
   return (
