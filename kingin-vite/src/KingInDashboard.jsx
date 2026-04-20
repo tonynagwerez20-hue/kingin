@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './kingin.css';
+import { getControlToken } from './tauri-stub.js';
 
 // =============================================================================
 // FORMATTERS
@@ -370,37 +371,86 @@ const useAppState = () => {
   };
 };
 
-const usePositions = () => {
-  const [positions, setPositions] = useState(generateMockPositions());
-  
+const useEngineState = () => {
+  const [engineState, setEngineState] = useState(null);
+  const [connected, setConnected] = useState(false);
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPositions(prev => prev.map(p => ({
-        ...p,
-        currentPrice: p.currentPrice + (Math.random() - 0.5) * 0.0001 * (p.symbol === 'XAUUSD' ? 1 : p.symbol === 'USDJPY' ? 10 : 1),
-      })));
-    }, 1000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const fetchState = async () => {
+      try {
+        const res = await fetch('/api/engine/state');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const state = await res.json();
+        if (!cancelled) {
+          setEngineState(state);
+          setConnected(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setConnected(false);
+        }
+      }
+    };
+
+    fetchState();
+    const interval = setInterval(fetchState, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
-  
-  const positionsWithPnL = useMemo(() => {
-    return positions.map(p => {
-      const multiplier = p.symbol === 'XAUUSD' ? 100 : 100000;
-      const priceDiff = p.direction === 'BUY' ? p.currentPrice - p.openPrice : p.openPrice - p.currentPrice;
-      const pnl = priceDiff * p.volume * multiplier;
-      return { ...p, pnl };
-    });
-  }, [positions]);
-  
-  const totalPnl = useMemo(() => 
-    positionsWithPnL.reduce((sum, p) => sum + p.pnl, 0), 
-  [positionsWithPnL]);
-  
-  return { positions: positionsWithPnL, totalPnl };
+
+  return { engineState, connected };
 };
 
-const useAccountStats = () => {
-  const [stats, setStats] = useState({
+const usePositions = (engineState, connected) => {
+  const [mockPositions] = useState(generateMockPositions());
+  const [mockTick, setMockTick] = useState(0);
+
+  const isApiReachable = connected;
+
+  useEffect(() => {
+    if (isApiReachable) return;
+    const interval = setInterval(() => setMockTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isApiReachable]);
+
+  const positions = useMemo(() => {
+    if (isApiReachable) {
+      const raw = Array.isArray(engineState?.positions) ? engineState.positions : [];
+      return raw.map((p, i) => ({
+        ticket: p.ticket || `POS-${i + 1}`,
+        symbol: p.symbol || 'XAUUSD',
+        direction: (p.type || 'BUY').toUpperCase(),
+        volume: Number(p.lots) || 0,
+        openPrice: Number(p.open_price) || 0,
+        currentPrice: Number(p.current_price) || Number(p.open_price) || 0,
+        openTime: p.open_time ? new Date(p.open_time).getTime() : Date.now(),
+        sl: Number(p.sl) || 0,
+        tp: Number(p.tp) || 0,
+        pnl: Number(p.floating_pnl) || 0,
+      }));
+    }
+    return mockPositions.map(p => {
+      const multiplier = p.symbol === 'XAUUSD' ? 100 : 100000;
+      const drift = (Math.sin(mockTick * 0.1 + p.ticket.charCodeAt(0)) * 0.0001) *
+        (p.symbol === 'XAUUSD' ? 10 : p.symbol === 'USDJPY' ? 10 : 1);
+      const cp = p.currentPrice + drift;
+      const priceDiff = p.direction === 'BUY' ? cp - p.openPrice : p.openPrice - cp;
+      const pnl = priceDiff * p.volume * multiplier;
+      return { ...p, currentPrice: cp, pnl };
+    });
+  }, [isApiReachable, engineState, mockPositions, mockTick]);
+
+  const totalPnl = useMemo(() => positions.reduce((sum, p) => sum + p.pnl, 0), [positions]);
+
+  return { positions, totalPnl };
+};
+
+const useAccountStats = (engineState, connected) => {
+  const [mockStats] = useState({
     balance: 24831.50,
     equity: 25102.30,
     marginUsed: 1240.00,
@@ -409,19 +459,23 @@ const useAccountStats = () => {
     openPositions: 7,
     winRate: 68.4,
   });
-  
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setStats(prev => ({
-        ...prev,
-        equity: prev.equity + (Math.random() - 0.5) * 2,
-        todayPnl: prev.todayPnl + (Math.random() - 0.5) * 1,
-      }));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-  
-  return stats;
+
+  if (connected && engineState) {
+    const balance = Number(engineState.account_balance) || 0;
+    const equity = Number(engineState.account_equity) || 0;
+    const floating = Number(engineState.floating_pnl) || 0;
+    return {
+      balance,
+      equity: equity || (balance + floating),
+      marginUsed: 0,
+      marginPercent: 0,
+      todayPnl: floating,
+      openPositions: Number(engineState.open_trades_count) || 0,
+      winRate: 0,
+    };
+  }
+
+  return mockStats;
 };
 
 const useMarketPrices = () => {
@@ -517,7 +571,44 @@ const StatCard = ({ label, value, subvalue, trend, highlight }) => (
   </div>
 );
 
-const OverviewPanel = ({ accountStats, positions, totalPnl }) => {
+const SignalStatusBar = ({ engineState }) => {
+  if (!engineState) return null;
+  const signal = engineState.signal_action || 'WAITING';
+  const bias = engineState.bias || 'NEUTRAL';
+  const price = Number(engineState.current_price) || 0;
+  const entry = Number(engineState.entry_price) || 0;
+  const sl = Number(engineState.stop_loss) || 0;
+  const tp = Number(engineState.take_profit) || 0;
+  const score = Number(engineState.confluence_score) || 0;
+  const kz = engineState.killzone || 'N/A';
+
+  const signalColor = signal === 'BUY' ? '#00e87a' : signal === 'SELL' ? '#ff2d4e' : '#ffaa00';
+  const biasColor = bias === 'BULLISH' ? '#00e87a' : bias === 'BEARISH' ? '#ff2d4e' : '#ffaa00';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap',
+      padding: '10px 16px', marginBottom: '16px',
+      background: 'var(--kg-surface, #0d0d0d)',
+      border: '1px solid var(--kg-border, #1a1a1a)',
+      borderRadius: '6px', fontSize: '11px', fontFamily: 'inherit',
+    }}>
+      <span style={{ color: 'var(--kg-muted, #556)', letterSpacing: '1px' }}>LIVE SIGNAL</span>
+      <span style={{ color: signalColor, fontWeight: 700, letterSpacing: '2px' }}>{signal}</span>
+      <span style={{ color: 'var(--kg-muted, #556)' }}>|</span>
+      <span style={{ color: 'var(--kg-muted, #556)' }}>BIAS</span>
+      <span style={{ color: biasColor, fontWeight: 700 }}>{bias}</span>
+      {price > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>PRICE <span style={{ color: '#dde' }}>${price.toFixed(2)}</span></span></>}
+      {entry > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>ENTRY <span style={{ color: '#dde' }}>${entry.toFixed(2)}</span></span></>}
+      {sl > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>SL <span style={{ color: '#ff2d4e' }}>${sl.toFixed(2)}</span></span></>}
+      {tp > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>TP <span style={{ color: '#00e87a' }}>${tp.toFixed(2)}</span></span></>}
+      {score > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>SCORE <span style={{ color: '#ffaa00' }}>{score.toFixed(1)}</span></span></>}
+      {kz !== 'N/A' && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>KZ <span style={{ color: '#dde' }}>{kz}</span></span></>}
+    </div>
+  );
+};
+
+const OverviewPanel = ({ accountStats, positions, totalPnl, engineState }) => {
   const [equityCurve] = useState(generateEquityCurve);
   const [alerts] = useState(generateAlerts);
   
@@ -531,14 +622,16 @@ const OverviewPanel = ({ accountStats, positions, totalPnl }) => {
           <p className="panel-subtitle">Real-time account and trading statistics</p>
         </div>
       </div>
+
+      <SignalStatusBar engineState={engineState} />
       
       <div className="stat-grid">
-        <StatCard label="BALANCE" value={formatCurrency(accountStats.balance)} subvalue="+2.3%" highlight />
-        <StatCard label="EQUITY" value={formatCurrency(accountStats.equity)} subvalue="Live" trend={1.1} />
+        <StatCard label="BALANCE" value={formatCurrency(accountStats.balance)} subvalue="Account balance" highlight />
+        <StatCard label="EQUITY" value={formatCurrency(accountStats.equity)} subvalue="Live equity" />
         <StatCard label="MARGIN USED" value={formatCurrency(accountStats.marginUsed)} subvalue={`${accountStats.marginPercent}% used`} />
-        <StatCard label="TODAY P&L" value={formatCurrency(accountStats.todayPnl)} subvalue={formatPercent(1.1)} trend={1.1} highlight />
-        <StatCard label="OPEN TRADES" value={accountStats.openPositions} subvalue="across 5 symbols" />
-        <StatCard label="WIN RATE" value={formatPercent(accountStats.winRate)} subvalue="last 30d" />
+        <StatCard label="TODAY P&L" value={formatCurrency(accountStats.todayPnl)} highlight />
+        <StatCard label="OPEN TRADES" value={accountStats.openPositions} subvalue="live positions" />
+        <StatCard label="WIN RATE" value={accountStats.winRate > 0 ? formatPercent(accountStats.winRate) : 'N/A'} subvalue="last 30d" />
       </div>
       
       <div className="two-col">
@@ -1420,8 +1513,9 @@ const SettingsPanel = () => {
 
 export default function KingInDashboard({ onLogout }) {
   const appState = useAppState();
-  const accountStats = useAccountStats();
-  const { positions, totalPnl } = usePositions();
+  const { engineState, connected } = useEngineState();
+  const accountStats = useAccountStats(engineState, connected);
+  const { positions, totalPnl } = usePositions(engineState, connected);
   const strategies = useStrategies();
   const { prices } = useMarketPrices();
   const riskMetrics = useRiskMetrics();
@@ -1434,7 +1528,7 @@ export default function KingInDashboard({ onLogout }) {
   }, []);
   
   const panels = {
-    overview: <OverviewPanel accountStats={accountStats} positions={positions} totalPnl={totalPnl} />,
+    overview: <OverviewPanel accountStats={accountStats} positions={positions} totalPnl={totalPnl} engineState={engineState} />,
     positions: <PositionsPanel positions={positions} />,
     'trade-history': <TradeHistoryPanel />,
     'strategy-engine': <StrategyEnginePanel strategies={strategies} />,
@@ -1456,7 +1550,46 @@ export default function KingInDashboard({ onLogout }) {
   ];
   
   const runningStrategies = strategies.filter(s => s.status === 'RUNNING').length;
-  
+  const [engineLoading, setEngineLoading] = useState(false);
+  const [engineMessage, setEngineMessage] = useState('');
+
+  const _engineControlFetch = useCallback(async (path) => {
+    const tok = await getControlToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (tok) headers['X-Control-Token'] = tok;
+    return fetch(path, { method: 'POST', headers, body: '{}' });
+  }, []);
+
+  const handleEngineStart = useCallback(async () => {
+    setEngineLoading(true);
+    setEngineMessage('');
+    try {
+      const res = await _engineControlFetch('/api/engine/start');
+      const data = await res.json();
+      setEngineMessage(data.success ? (data.message || 'Engine started') : (data.error || 'Start failed'));
+    } catch (e) {
+      setEngineMessage('Start request failed: ' + e.message);
+    } finally {
+      setEngineLoading(false);
+      setTimeout(() => setEngineMessage(''), 4000);
+    }
+  }, [_engineControlFetch]);
+
+  const handleEngineStop = useCallback(async () => {
+    setEngineLoading(true);
+    setEngineMessage('');
+    try {
+      const res = await _engineControlFetch('/api/engine/stop');
+      const data = await res.json();
+      setEngineMessage(data.success ? (data.message || 'Engine stopped') : (data.error || 'Stop failed'));
+    } catch (e) {
+      setEngineMessage('Stop request failed: ' + e.message);
+    } finally {
+      setEngineLoading(false);
+      setTimeout(() => setEngineMessage(''), 4000);
+    }
+  }, [_engineControlFetch]);
+
   return (
     <div className={`kingin-dashboard ${appState.sidebarExpanded ? 'sidebar-expanded' : ''}`}>
       {/* Top Bar */}
@@ -1467,13 +1600,46 @@ export default function KingInDashboard({ onLogout }) {
         </div>
         
         <div className="top-center">
-          <div className={`status-badge ${appState.connectionStatus.toLowerCase()}`}>
-            {appState.connectionStatus}
+          <div className={`status-badge ${connected ? (engineState?.running ? 'live' : 'connected') : 'offline'}`}>
+            {connected ? (engineState?.running ? 'ENGINE LIVE' : 'API CONNECTED') : 'OFFLINE'}
           </div>
           <div className="broker-time">{brokerTime.toLocaleTimeString()}</div>
         </div>
         
         <div className="top-right">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '8px' }}>
+            <button
+              onClick={handleEngineStart}
+              disabled={engineLoading || (engineState?.running === true)}
+              style={{
+                padding: '4px 10px', fontSize: '10px', fontWeight: 700,
+                background: 'transparent', border: '1px solid #00e87a', borderRadius: '3px',
+                color: '#00e87a', cursor: engineLoading || engineState?.running ? 'not-allowed' : 'pointer',
+                opacity: engineLoading || engineState?.running ? 0.4 : 1,
+                fontFamily: 'inherit', letterSpacing: '1px',
+              }}
+            >
+              START
+            </button>
+            <button
+              onClick={handleEngineStop}
+              disabled={engineLoading || !engineState?.running}
+              style={{
+                padding: '4px 10px', fontSize: '10px', fontWeight: 700,
+                background: 'transparent', border: '1px solid #ff2d4e', borderRadius: '3px',
+                color: '#ff2d4e', cursor: engineLoading || !engineState?.running ? 'not-allowed' : 'pointer',
+                opacity: engineLoading || !engineState?.running ? 0.4 : 1,
+                fontFamily: 'inherit', letterSpacing: '1px',
+              }}
+            >
+              STOP
+            </button>
+            {engineMessage && (
+              <span style={{ fontSize: '10px', color: '#ffaa00', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {engineMessage}
+              </span>
+            )}
+          </div>
           <div className="top-stat">
             <span className="value">{runningStrategies}/{strategies.length}</span>
           </div>

@@ -18,6 +18,10 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "KingIn API"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -30,6 +34,21 @@ task = "shell.exec"
 args = "bash -c 'cd kingin-vite && npm install --prefer-offline 2>/dev/null; npm run dev'"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "KingIn API"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python kingin_api.py"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
