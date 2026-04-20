@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './kingin.css';
-import { getControlToken } from './tauri-stub.js';
 
 // =============================================================================
 // FORMATTERS
@@ -1554,9 +1553,7 @@ export default function KingInDashboard({ onLogout }) {
   const [engineMessage, setEngineMessage] = useState('');
 
   const _engineControlFetch = useCallback(async (path) => {
-    const tok = await getControlToken();
     const headers = { 'Content-Type': 'application/json' };
-    if (tok) headers['X-Control-Token'] = tok;
     return fetch(path, { method: 'POST', headers, body: '{}' });
   }, []);
 

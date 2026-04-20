@@ -1,5 +1,4 @@
 import MetaTrader5 as mt5
-import json
 import os
 
 def check_mt5_settings():
@@ -35,8 +34,15 @@ def check_mt5_settings():
             print("5. Check 'Allow external experts imports'")
             print("6. Restart MT5 terminal")
 
-        # Try to login
-        login_result = mt5.login(435341374, password="@Shisa69", server="Exness-MT5Trial9")
+        login = os.getenv("MT5_LOGIN")
+        password = os.getenv("MT5_PASSWORD")
+        server = os.getenv("MT5_SERVER")
+
+        if not login or not password or not server:
+            print("Set MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER environment variables to test login.")
+            return bool(terminal_info.connected)
+
+        login_result = mt5.login(int(login), password=password, server=server)
         if login_result:
             print("Login successful!")
             account_info = mt5.account_info()

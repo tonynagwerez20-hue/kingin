@@ -44,17 +44,20 @@ echo [OK] Folders ready.
    node --version >nul 2>&1
    if %ERRORLEVEL% equ 0 (
        echo [OK] Node.js detected.
-       if exist "dashboard-react\package.json" (
-           echo [INFO] Installing React dashboard dependencies...
-           cd dashboard-react
-           call npm install --silent
+       if exist "kingin-vite\package.json" (
+           echo [INFO] Installing KingIn React dashboard dependencies...
+           cd kingin-vite
+           if exist package-lock.json (
+               call npm ci --silent
+           ) else (
+               call npm install --silent
+           )
            echo [INFO] Building React dashboard...
            call npm run build --silent
            cd ..
-           echo [OK] React dashboard built at dashboard-react\build\
-           echo        (The system will serve the built dashboard from dashboard\ if available)
+           echo [OK] React dashboard built at kingin-vite\dist\
        ) else (
-           echo [INFO] dashboard-react\package.json not found. Skipping React build.
+           echo [INFO] kingin-vite\package.json not found. Skipping React build.
        )
    ) else (
        echo [INFO] Node.js not found. React dashboard development features skipped.
@@ -68,7 +71,7 @@ echo    SETUP COMPLETE
 echo ==========================================================
 echo 1. Open MetaTrader 5 and log in.
 echo 2. Run START_ALL.bat to launch the system.
-echo 3. React dashboard: http://localhost:3000  (if enabled)
+echo 3. Local React dashboard: run LAUNCH_DESKTOP_APP.bat, then open http://localhost:5000
 echo.
 echo NOTE: Global Python 3.10 is the recommended stable path.
 echo       Avoid virtual environments if you experience crashes.

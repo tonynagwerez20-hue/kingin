@@ -100,7 +100,6 @@ Different assets often require different brokers or specialized MT5 account grou
 
 ---
 
-<<<<<<< HEAD
 ## 🛠️ Infrastructure Stability (v6.1 Milestone)
 The system has standardized on **Global Python 3.10** to solve environment-level crashes.
 - **Portability**: Verified setup via `SETUP_PROJECT.bat`.
@@ -108,15 +107,3 @@ The system has standardized on **Global Python 3.10** to solve environment-level
 
 ---
 *End of Multi-Asset Master Scaling Specification v1.2 (v6.1 Hardened)*
-=======
-## 🛡️ 6. Institutional Risk Management (Global View)
-- **Symbol Concentration Limits**: A circuit breaker that prevents the total fund from going too heavy on one asset group (e.g., "Max 50% Equity in Crypto").
-- **Asset Specific SL**: Gold uses Fixed Pips, while BTC uses % distance or ATR-based caps.
-
----
-> [!IMPORTANT]
-> **Production Recommendation**: When scaling to multi-asset, ensure `zmq.CONFLATE` is active for each symbol's data stream to prevent execution lag.
-
----
-*End of Multi-Asset Master Scaling Specification v1.1*
->>>>>>> replit-agent

@@ -1,353 +1,210 @@
-<<<<<<< HEAD
-# Institutional Trading System v6.1 (Restored)
+# KingIn Institutional Trading System
 
-Professional-grade SMC (Smart Money Concepts) trading robot for MetaTrader 5 with real-time orderflow and multi-layer filtration.
+Professional SMC/ICT trading control room for MetaTrader 5, with a Python trading engine, local API server, and React dashboard.
 
-## 📥 New Machine Setup
-Follow these steps to replicate this exact environment on a new machine:
+This `master` branch is set up for Windows desktop use as a local app: the Python backend runs on your machine, the React dashboard opens in your browser at `http://localhost:5000`, and MetaTrader 5 handles live broker connectivity/execution.
 
-1. **Install Python 3.10.x**: 
-   - [Download from Python.org](https://www.python.org/downloads/windows/)
-   - **IMPORTANT**: During installation, tick the box: **"Add Python 3.10 to PATH"**.
-2. **Install MetaTrader 5**: 
-   - Ensure your broker terminal is installed and logged in.
-3. **Run `SETUP_PROJECT.bat`**: 
-   - This will install all necessary libraries (`fastapi`, `streamlit`, `mt5`, etc.) into your global Python environment.
-   - It is the most stable method for this system.
+## What is included
 
-## 🚀 One-Click Control
-- **`START_ALL.bat`**: The master button. Launches the Data Server, Strategy Engine, and Dashboard together.
-- **`SYSTEM_ON.bat` / `SYSTEM_OFF.bat`**: Toggles the trading logic without stopping the engine.
-- **`START_DASHBOARD.bat`**: Launches the Streamlit performance monitor.
+- Python trading engine in `Engine/`
+- MT5/data-feed modules in `data_feed/` and `execution/`
+- FastAPI dashboard bridge in `kingin_api.py` on port `8080`
+- React/Vite control-room dashboard in `kingin-vite/` on port `5000`
+- Windows setup and launch scripts for local desktop operation
+- Streamlit/legacy dashboard files in `dashboard/`
 
-## ⚙️ Configuration
-The system uses **`config/trading_params_lite.json`** as its single source of truth.
-- Update your **Login**, **Password**, and **Server** under the `data_provider` section.
-- The system enforces a **STRICT LOGIN** policy — it will only trade on the account provided in the config.
+## Desktop installation on Windows
 
-## 📂 Architecture
-- **`/Engine`**: The "Brain". Contains SMC logic and IGOF filtration layers.
-- **`/data_feed`**: The "Nervous System". Connects to MT5 and serves live market data.
-- **`/storage/logs`**: Real-time audit logs (`server_live.log`).
-- **`/dashboard`**: Premium monitoring UI.
+### 1. Install prerequisites
 
-## 🛠 Stability Note
-If the system crashes with code `-1073741510`, it is usually due to a corrupted Virtual Environment. Always prefer the **Global Python** path on Windows for maximum reliability.
-=======
-# HedgeEA Trading System v4.1
+Install these before running the project:
 
-**Professional-grade algorithmic trading system for Gold (XAUUSD) with multi-layer filtration, modular architecture, and comprehensive risk management.**
+- Windows 10/11
+- Python 3.10 or newer from `https://www.python.org/downloads/windows/`
+  - During install, tick `Add Python to PATH`.
+- Node.js 18 or newer from `https://nodejs.org/`
+- MetaTrader 5, logged into your broker/demo account
+- Optional: Sierra Chart if you use the DTC data-feed path
 
-[![System Maturity](https://img.shields.io/badge/Maturity-85%25%20Production%20Ready-green)]()
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)]()
-[![License](https://img.shields.io/badge/License-Proprietary-red)]()
+### 2. Clone the correct branch
 
----
-
-## 🎯 Overview
-
-HedgeEA is a sophisticated trading system that combines ICT (Inner Circle Trader) concepts with Smart Money Concepts (SMC) and advanced order flow analysis. The system features a 6-layer filtration engine, modular strategy architecture, and centralized risk management.
-
-**Key Features:**
-- ✅ Multi-layer IGOF (Institutional Grade Order Flow) filtration
-- ✅ Hybrid data mode (CSV + Live DTC streaming)
-- ✅ Plug-and-play strategy system
-- ✅ Centralized risk management with daily loss limits
-- ✅ Session-based filtering (London + NY sessions)
-- ✅ Modular architecture with dependency injection
-- ✅ Comprehensive backtesting capabilities
-
----
-
-## 📊 System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Main Trading Loop                        │
-│                   (main_loop.py - 200 lines)                 │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                ┌─────────────┴─────────────┐
-                │                           │
-        ┌───────▼────────┐         ┌───────▼────────┐
-        │ SystemBootstrap│         │ TradingLoop    │
-        │    (Startup)   │         │  Controller    │
-        └────────────────┘         └────────────────┘
-                                           │
-        ┌──────────────────────────────────┼──────────────────────┐
-        │                                  │                      │
-┌───────▼────────┐              ┌─────────▼─────────┐  ┌────────▼────────┐
-│  V1 Filtration │              │  Strategy Manager │  │  Risk Manager   │
-│     Engine     │              │  (Plug-and-Play)  │  │  (Centralized)  │
-│   (6 Layers)   │              └───────────────────┘  └─────────────────┘
-└────────────────┘                        │
-        │                        ┌────────┴────────┐
-        │                        │                 │
-        │                ┌───────▼──────┐  ┌──────▼──────┐
-        │                │ Candlestick  │  │  FilterOne  │
-        │                │   Strategy   │  │  FilterTwo  │
-        │                └──────────────┘  └─────────────┘
-        │
-┌───────▼────────┐
-│   MT5 Bridge   │
-│  (Execution)   │
-└────────────────┘
+```powershell
+git clone -b master https://github.com/tonynagwerez20-hue/kingin.git
+cd kingin
 ```
 
----
+If you already cloned the repository:
 
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.8+
-- MetaTrader 5 (for live trading)
-- Sierra Chart (optional, for DTC data feed)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd s.y.s.t.e.m
-
-# Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
-
-# Install dependencies
-pip install -r requirements.txt
+```powershell
+git fetch origin
+git checkout master
+git pull origin master
 ```
 
-### Configuration
+### 3. Install dependencies
 
-1. **Edit `config/trading_params.json`** - Set your trading parameters:
-   - Symbol, pip values, risk percentage
-   - IGOF layer thresholds
-   - Session filter times
-   - Risk limits (daily loss, max trades)
+Recommended one-click setup:
 
-2. **Edit `config/settings.py`** - Set system-wide settings:
-   - API URLs
-   - Default account balance
-   - Loop intervals
-
-### Running the System
-
-**Backtest Mode:**
-```bash
-python Engine/main_loop.py --backtest
+```powershell
+.\SETUP_PROJECT.bat
 ```
 
-**Live Trading:**
-```bash
-python Engine/main_loop.py
+For the local React dashboard setup/build:
+
+```powershell
+.\SETUP_TAURI.bat
 ```
 
----
+Despite the historical filename, `SETUP_TAURI.bat` now prepares the local browser-based desktop dashboard in this branch. There is no Tauri native-app project in `master` because there is no `src-tauri`, `Cargo.toml`, or Tauri config present.
 
-## 🔧 Core Components
+Manual setup equivalent:
 
-### 1. V1 Filtration Engine (`Engine/igof/v1_engine.py`)
-
-6-layer deterministic filtration system:
-
-| Layer | Purpose | Threshold |
-|-------|---------|-----------|
-| **L1** | H1 Structural Bias | Min score: 2/3 |
-| **L2** | Zone Quality | Min score: 3/5 |
-| **L3** | Liquidity Event | Boolean |
-| **L4** | Microstructure Shift | Boolean |
-| **L5** | Displacement | Boolean |
-| **L6** | Candlestick Pattern | Boolean |
-
-**Hybrid Filtration:** Only validates BOS/Displacement if H1 candle is in final 5 minutes (reduces fakeout risk by 80%).
-
-### 2. Strategy System (Plug-and-Play)
-
-**Adding a New Strategy:**
-
-```python
-# 1. Create your strategy
-class MyStrategy:
-    def generate_signal(self, candles):
-        # Your logic
-        return {"action": "LONG", "price": 1850.0, ...}
-
-# 2. Add to system_bootstrapper.py
-alpha_strategies = [
-    MyStrategy(),  # ← Just add it here!
-    CandlestickStrategy(),
-    FilterOne()
-]
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+cd kingin-vite
+npm install
+npm run build
+cd ..
 ```
 
-### 3. Risk Management (`support/risk/risk_manager.py`)
+### 4. Configure trading access
 
-**Centralized Risk Controls:**
-- Daily loss limit (default: $500)
-- Max trades per day (default: 10)
-- Max concurrent positions (default: 3)
-- Global kill switch
-- Automatic daily reset
+Review these files before live/demo operation:
 
-### 4. System Bootstrapper (`Engine/system_bootstrapper.py`)
+- `config/trading_params_lite.json`
+  - `pipeline.data_provider.config.login`
+  - `pipeline.data_provider.config.password`
+  - `pipeline.data_provider.config.server`
+  - `trading.symbol`
+  - `trading.lot_size`
+  - `trading.master_switch`
+- `config/trading_params.json` for the fuller strategy configuration
+- `config/settings.py` for system-level settings
 
-Handles all startup logic:
-- Dependency verification
-- MT5 Bridge initialization
-- Risk/strategy setup
-- Buffer warmup
+Do not live trade until you have verified the account, symbol, risk limits, and master switch settings on a demo account.
 
-### 5. Trading Loop Controller (`Engine/trading_loop_controller.py`)
+### 5. Launch the local desktop dashboard
 
-Orchestrates the main trading loop:
-- Data fetching
-- Signal processing
-- Risk checks
-- Trade execution
+Use:
 
----
-
-## 📁 Project Structure
-
-```
-s.y.s.t.e.m/
-├── Engine/
-│   ├── main_loop.py              # Main entry point (200 lines)
-│   ├── system_bootstrapper.py    # Startup logic
-│   ├── trading_loop_controller.py # Trading loop
-│   ├── igof/
-│   │   ├── v1_engine.py          # 6-layer filtration
-│   │   └── stack.py              # Filtration controller
-│   └── position_tracker.py       # Position management
-├── support/
-│   ├── strategies/
-│   │   ├── manager.py            # Strategy orchestration
-│   │   ├── candlestick_trigger.py
-│   │   ├── filter_one.py
-│   │   └── filter_two.py
-│   └── risk/
-│       ├── risk_manager.py       # Centralized risk
-│       ├── cro_rules.py          # Pre-execution checks
-│       └── regime_layer.py       # Market regime detection
-├── config/
-│   ├── trading_params.json       # All trading parameters
-│   └── settings.py               # System settings
-├── data_feed/
-│   ├── server.py                 # Data feed API
-│   ├── dtc_client.py             # Sierra Chart DTC client
-│   └── csv_processor.py          # CSV data loading
-├── execution/
-│   └── bridge.py                 # MT5 ZeroMQ bridge
-└── tests/
-    └── test_v1_filtration.py     # Unit tests
+```powershell
+.\LAUNCH_DESKTOP_APP.bat
 ```
 
----
+This starts:
 
-## 🎛️ Configuration
+- API server: `http://127.0.0.1:8080`
+- React dashboard: `http://localhost:5000`
 
-### Trading Parameters (`config/trading_params.json`)
+The dashboard uses same-origin `/api/*` calls through the Vite proxy, so browser code does not need direct cross-origin API access.
 
-```json
-{
-  "trading": {
-    "symbol": "XAUUSD",
-    "pip_value": 0.1,
-    "risk_percent": 1.0
-  },
-  "execution": {
-    "sl_buffer_pips": 2,
-    "partial_tp_enabled": true,
-    "partial_tp_close_percent": 50,
-    "partial_tp_rr_trigger": 3.0
-  },
-  "session_filter": {
-    "enabled": true,
-    "start_hour_utc": 8,
-    "end_hour_utc": 21
-  },
-  "risk_management": {
-    "max_daily_loss": 500.0,
-    "max_trades_per_day": 10,
-    "max_concurrent_positions": 3
-  }
-}
+### 6. Launch the trading pipeline
+
+For one-click trading-system startup:
+
+```powershell
+.\START_ALL.bat
 ```
 
----
+This script:
 
-## 🧪 Testing
+1. Turns the master switch on.
+2. Starts the data-feed server.
+3. Starts the enabled dashboard option from config.
+4. Runs the modular strategy pipeline.
 
-**Run Unit Tests:**
-```bash
-python tests/test_v1_filtration.py
+You can also run the engine directly:
+
+```powershell
+python -m Engine.modular_bootstrapper
 ```
 
-**Backtest with Historical Data:**
-```bash
-python Engine/main_loop.py --backtest
+## MT5 pre-flight checklist
+
+Before running live/demo execution:
+
+- Open MetaTrader 5.
+- Log into the intended account.
+- Confirm Algo Trading is enabled.
+- Attach/enable the ZMQ bridge EA if your execution path requires it.
+- Confirm the configured account/server in `config/trading_params_lite.json` matches MT5.
+- Start with demo trading and minimum lot size.
+
+## Useful commands
+
+Run API only:
+
+```powershell
+python kingin_api.py
 ```
 
----
+Run dashboard only:
 
-## 📈 Performance
+```powershell
+cd kingin-vite
+npm run dev
+```
 
-**System Maturity:** 85% Production Ready
+Build dashboard assets:
 
-**Improvements (v4.0 → v4.1):**
-- ✅ 80% fakeout risk reduction (Hybrid Filtration)
-- ✅ 62% code reduction in main_loop.py (526 → 200 lines)
-- ✅ 100% config externalization
-- ✅ Full modular architecture
+```powershell
+.\BUILD_DESKTOP_APP.bat
+```
 
-**Critical Gap:** News filter required before live deployment
+Run Streamlit dashboard manually:
 
----
+```powershell
+streamlit run dashboard/dashboard_app.py
+```
 
-## 🛡️ Risk Disclaimer
+Run historical/backtest scripts:
 
-**This system is for educational purposes only.** Trading involves substantial risk of loss. Past performance does not guarantee future results. Always test thoroughly on a demo account before live trading.
+```powershell
+python run_backtest.py
+python Engine/historical_backtest.py
+```
 
----
+## Project structure
 
-## 📚 Documentation
+```text
+kingin/
+├── Engine/                  Python trading engine and strategy pipeline
+├── config/                  Trading/account/risk configuration
+├── data_feed/               MT5/Sierra/data provider modules
+├── dashboard/               Streamlit and static dashboard assets
+├── execution/               Execution bridge modules
+├── kingin-vite/             React/Vite control-room dashboard
+├── storage/logs/            Runtime logs
+├── kingin_api.py            FastAPI bridge for dashboard and engine controls
+├── START_ALL.bat            One-click trading-system launcher
+├── SETUP_PROJECT.bat        Python dependency/setup helper
+├── LAUNCH_DESKTOP_APP.bat   Local API + React dashboard launcher
+└── BUILD_DESKTOP_APP.bat    React dashboard production build helper
+```
 
-- [System Review](docs/SYSTEM_REVIEW.md) - Technical audit
-- [Trader Panel Review](docs/TRADER_PANEL_REVIEW.md) - Professional trader analysis
-- [Expert Panel Review V2](docs/EXPERT_PANEL_REVIEW_V2.md) - Post-implementation assessment
-- [Walkthrough](docs/walkthrough.md) - System improvements summary
+## Troubleshooting
 
----
+### `Python is not installed or not in PATH`
 
-## 🔄 Version History
+Reinstall Python and tick `Add Python to PATH`, then open a new terminal and rerun setup.
 
-### v4.1 (2026-02-16)
-- ✅ Complete system modularization
-- ✅ Hybrid Filtration implementation
-- ✅ Config externalization
-- ✅ Centralized risk management
-- ✅ Session filtering
+### `MetaTrader5` fails to install
 
-### v4.0
-- Initial multi-layer filtration system
-- Hybrid data mode
-- Strategy manager
+The `MetaTrader5` Python package is Windows-only and requires a compatible Python installation. Use Python 3.10/3.11 on Windows if your current version fails.
 
----
+### Dashboard cannot reach API
 
-## 🤝 Contributing
+Start `kingin_api.py` first, then start `kingin-vite` with `npm run dev`. The dashboard expects the API on `127.0.0.1:8080` through the `/api` proxy.
 
-This is a proprietary system. Contact the maintainer for collaboration opportunities.
+### Port already in use
 
----
+Close old command windows or stop the process using ports `5000`, `8080`, or `8000`, then relaunch.
 
-## 📧 Contact
+### Sierra Chart NTP Error 1314
 
-For questions or support, please contact the system maintainer.
+If MT5 is your execution path, this does not block MT5 trade execution. Sierra Chart is only relevant when used as a data feed.
 
----
+## Risk disclaimer
 
-**Built with precision. Traded with discipline.**
->>>>>>> replit-agent
+Trading involves substantial risk. This system is for research and educational use unless you have independently validated it. Always test on a demo account before live trading.

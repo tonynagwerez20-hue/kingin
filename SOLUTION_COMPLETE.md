@@ -42,7 +42,7 @@ How it works:
 Updated trading_params_lite.json:
   Changed FROM:
     "login": 435341374,
-    "password": "@Shisa69",
+    "password": "YOUR_PASSWORD",
     "server": "Exness-MT5Trial9"
   
   Changed TO:
@@ -83,7 +83,7 @@ BEFORE vs AFTER:
 │ Config (static):                                           │
 │   login: 435341374                                         │
 │   server: Exness-MT5Trial9                                 │
-│   password: @Shisa69                                       │
+│   password: YOUR_PASSWORD                                  │
 │                                                             │
 │ Problem: Only that ONE account works                       │
 │ Problem: Different brokers can't connect                  │

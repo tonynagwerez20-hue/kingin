@@ -1,247 +1,133 @@
 # Trading on MT5 - Simplified Setup Guide
 
-## ✅ Good News!
+If you are executing trades through MetaTrader 5, Sierra Chart is not required for order execution. Sierra Chart is only relevant when you choose to use it as a market-data feed.
 
-If you're **executing trades on MT5** (not Sierra Chart), you can **ignore the NTP Error 1314**. 
+## What you need
 
-Sierra Chart is only used for **data feed** in your system. The NTP sync error won't affect:
-- ✅ Market data reception
-- ✅ Trade execution (handled by MT5)
-- ✅ Dashboard updates
-- ✅ Strategy signals
+### MetaTrader 5 for execution
 
----
+Required:
 
-## What You Actually Need
+- MT5 installed and logged into the intended account
+- Algo Trading enabled
+- Broker connection active
+- ZMQ bridge EA attached if your execution path requires it
+- Account/server details matching `config/trading_params_lite.json`
 
-### 1. Sierra Chart (Data Feed Only)
+### Sierra Chart for optional DTC data feed
 
-**Purpose**: Receive real-time market data via DTC protocol
+Required only if you use Sierra Chart as the data source:
 
-**What's Required**:
-- ✅ DTC Protocol Server enabled
-- ✅ Connection to data feed (ports 11099, 11098)
-- ❌ **NOT required**: Administrator rights
-- ❌ **NOT required**: NTP sync
-- ❌ **NOT required**: Trading enabled in Sierra Chart
+- DTC Protocol Server enabled
+- Data-feed connection active
+- DTC ports available, commonly `11099`/`11098`
 
-**Why NTP Error is OK**:
-- NTP sync only matters if Sierra Chart is sending orders to a broker
-- Since you're using MT5 for execution, Sierra Chart just needs to receive data
-- Data timestamps come from the feed server, not your local clock
+Not required for MT5 execution:
 
----
+- Sierra Chart administrator mode
+- Sierra Chart trading permissions
+- Sierra Chart NTP sync
 
-### 2. MetaTrader 5 (Trade Execution)
+## Simplified startup for MT5 execution mode
 
-**Purpose**: Execute all buy/sell orders
-
-**What's Required**:
-- ✅ Algo Trading enabled (green button)
-- ✅ DLL imports allowed
-- ✅ ZMQ Bridge EA running (smiley face 🙂)
-- ✅ Connected to broker account
-
-**This is your critical component for trading!**
-
----
-
-## Simplified Startup (MT5 Execution Mode)
-
-<<<<<<< HEAD
 ### Step 1: Start MetaTrader 5
-```
-1. Open MT5
-2. Enable "Algo Trading" (green)
-3. Connect to your Demo Account
-```
 
-### Step 2: Start The System (One-Click)
-We have unified the startup sequence for maximum convenience.
+1. Open MT5.
+2. Log into your demo or live account.
+3. Enable Algo Trading.
+4. Attach the ZMQ bridge EA if execution depends on it.
+5. Confirm the configured account in `config/trading_params_lite.json` matches the MT5 account.
 
-1. Double-click the **`START_ALL.bat`** file in the project directory.
+### Step 2: Start the local dashboard, if needed
 
-This script will automatically:
-1. Turn the Master Switch **ON**.
-2. Launch the **Data Feed Server** securely in the background.
-3. Launch the **Professional CLI Dashboard** in your current window.
-4. Begin acquiring Multi-Timeframe (MTF) Data and polling for signals.
-=======
-### Step 1: Start Sierra Chart (Normal Mode)
-```
-Just double-click SierraChart_64.exe
-No need for "Run as Administrator"
-```
-
-**Verify**:
-- DTC server shows "Listening on port 11099"
-- You can ignore the NTP error message
-
-### Step 2: Start MetaTrader 5
-```
-1. Open MT5
-2. Enable "Algo Trading" (green)
-3. Attach ZMQ Bridge EA to chart
-4. Verify smiley face 🙂
-```
-
-### Step 3: Start Python System
 ```powershell
-# Terminal 1: Data Feed
-cd e:\s.y.s.t.e.m
+.\LAUNCH_DESKTOP_APP.bat
+```
+
+This starts the KingIn API and opens the React dashboard at `http://localhost:5000`.
+
+### Step 3: Start the trading pipeline
+
+```powershell
+.\START_ALL.bat
+```
+
+The script turns the master switch on, starts the data-feed server, launches enabled dashboards, and runs the modular strategy pipeline.
+
+Manual equivalent:
+
+```powershell
 python data_feed/server.py
-
-# Terminal 2: Trading Engine
-cd e:\s.y.s.t.e.m
-python Engine/main_loop.py
-
-# Terminal 3: Dashboard
-cd e:\s.y.s.t.e.m
+python -m Engine.modular_bootstrapper
 streamlit run dashboard/dashboard_app.py
 ```
->>>>>>> replit-agent
 
----
+## Data flow
 
-## How It Works
-
-```
-<<<<<<< HEAD
-MT5 Broker Data → Python Engine (MTF Analysis) 
-     ↓                      ↓
- CLI Dashboard      Dynamic Risk Checks
-     ↓                      ↓
- MT5 (Execution) ←- Validated Signals
+```text
+MT5 broker/account data -> Python engine -> risk checks -> validated signals -> MT5 execution
+                              |
+                              v
+                    local API/dashboard logs
 ```
 
-**Data Flow**:
-1. Python engine queries MT5 for H4, H1, M15, M5, and M1 data.
-2. The `IGOFEngine` processes the data through 6 institutional layers.
-3. The `UltraLowAccountRiskRule` verifies the trade against the $7.50 equity floor and dynamic scaling parameters.
-4. Dashboard shows pipeline and account metrics in real-time.
-5. ZMQ Bridge (if attached) handles execution based on the generated signal.
+When Sierra Chart is enabled as a data feed:
 
----
+```text
+Sierra Chart DTC data -> Python engine -> MT5 execution
+```
 
-## Pre-Flight Checklist for Forward Testing
+## Pre-flight checklist
 
-Before running `START_ALL.bat`, verify:
+Before forward testing:
 
 | Check | Expected |
 |-------|----------|
-| MetaTrader 5 open | Yes |
-| Algo Trading button | Green |
-| Account Balance | $10.00 |
-| Equity Floor (config) | $7.50 |
-| Lot Size (enforced) | 0.01 |
-| Master Switch | Will be set ON by script |
+| MT5 open and connected | Yes |
+| Algo Trading | Enabled |
+| Config account/server | Matches MT5 |
+| Lot size | Confirmed in config |
+| Master switch | Enabled only when intended |
+| Demo account | Strongly recommended first |
 
-> [!NOTE]
-> Run `python verify_mt5_connection.py` to quickly confirm your MT5 connection is active before starting.
+## About Sierra Chart NTP Error 1314
 
-=======
-Sierra Chart (Data) → Python Engine (Signals) → MT5 (Execution)
-     ↓                      ↓                        ↓
-  DTC Feed            Strategy Logic           Real Trades
-```
+If you see NTP Error 1314 in Sierra Chart, it usually means Windows denied a time-sync privilege. For MT5 execution mode, this does not block MT5 order execution.
 
-**Data Flow**:
-1. Sierra Chart receives market data from broker/feed
-2. Python engine analyzes data and generates signals
-3. MT5 executes trades via ZMQ bridge
-4. Dashboard shows everything in real-time
+Optional ways to remove the message:
 
----
-
-## If NTP Error Bothers You (Optional Fix)
-
-If you want to remove the error message from Sierra Chart logs:
-
-### Option A: Run as Administrator (One-Time Setup)
-1. Right-click `SierraChart_64.exe`
-2. Select "Properties"
-3. Go to "Compatibility" tab
-4. ✅ Check "Run this program as an administrator"
-5. Click OK
-
-Now Sierra Chart will always run with admin rights when you double-click it.
-
-### Option B: Disable NTP Sync
-1. In Sierra Chart: `Global Settings` → `General Settings`
-2. Find "NTP Time Synchronization"
-3. Uncheck "Enable NTP Time Synchronization"
-4. Click OK
-
-This stops Sierra Chart from trying to sync time (and stops the error).
-
----
-
-## Verify Your Setup
-
-Run the diagnostic:
-```powershell
-python tests/diag_system_health.py
-```
-
-**Expected for MT5 Execution Mode**:
-```
-✅ DTC Live Port (11099): REACHABLE
-⚠️  DTC Login: SUCCESS (TradingIsSupported: 0 is OK)
-✅ MT5 Bridge: CONNECTED
-✅ Account Balance: $10,000.00
-✅ API Status: DTC
-✅ Latest Price: 2654.75
-```
-
-**Note**: `TradingIsSupported: 0` is **fine** because you're not trading through Sierra Chart!
-
----
->>>>>>> replit-agent
-
-## What Actually Matters for Trading
-
-| Component | Status Needed | Why |
-|-----------|--------------|-----|
-| **Sierra Chart DTC** | Connected | Provides market data |
-| **MT5 Bridge** | Connected | Executes your trades |
-| **MT5 Algo Trading** | Enabled | Allows EA to run |
-| **Python Engine** | Running | Generates signals |
-
-**Not Critical**:
-- ❌ Sierra Chart admin rights
-- ❌ NTP sync
-- ❌ Sierra Chart trading enabled
-- ❌ Windows Firewall (if using localhost)
-
----
+1. Run Sierra Chart as administrator.
+2. Disable NTP time synchronization in Sierra Chart settings.
 
 ## Troubleshooting
 
-### "Still seeing Error 1314 in logs"
-**Answer**: Ignore it! It doesn't affect data reception or MT5 execution.
+### Data not flowing
 
-### "Want to remove the error message"
-**Answer**: Use Option A or B above to stop the NTP sync attempts.
+Check:
 
-### "Data not flowing to Python"
-**Check**:
-1. Sierra Chart shows "Conn" (connected to feed)
-2. DTC server is listening on port 11099
-3. Python shows `[DTC] LIVE Logon Success`
+1. MT5 is open and connected.
+2. The configured symbol exists in your broker account.
+3. If using Sierra Chart, DTC is listening on the configured port.
+4. Python dependencies were installed from `requirements.txt`.
 
-### "Trades not executing"
-**Check**:
-1. MT5 Algo Trading is GREEN
-2. EA shows smiley face 🙂
-3. Python shows `✅ [Pre-Flight] MT5 Bridge: CONNECTED`
+### Trades not executing
 
----
+Check:
+
+1. MT5 Algo Trading is enabled.
+2. ZMQ bridge EA is attached if required.
+3. The account in config matches the logged-in MT5 account.
+4. Risk rules are not blocking the signal.
+5. Master switch is enabled.
+
+### Dashboard not updating
+
+Check:
+
+1. `python kingin_api.py` is running.
+2. `kingin-vite` is running with `npm run dev`.
+3. Browser is open at `http://localhost:5000`.
 
 ## Summary
 
-For **MT5 execution mode**:
-- ✅ Sierra Chart: Just needs to receive data (no admin rights needed)
-- ✅ MT5: Handles all trade execution (this is critical)
-- ✅ Python: Connects both and runs strategy
-
-**You can safely ignore Error 1314** - it won't affect your trading!
+For MT5 execution mode, MT5 is the critical execution component, Python runs the strategy/risk pipeline, and the dashboard is only the local monitoring/control surface.

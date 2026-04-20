@@ -1,29 +1,7 @@
-// tauri-stub.js — replaces Tauri desktop invoke() with real HTTP calls
-// to the KingIn API server (kingin_api.py running on port 8080).
-// The Vite dev server proxies /api/* to http://localhost:8080.
-
 const API_BASE = '/api';
 
-let _controlToken = null;
-
-const _fetchToken = async () => {
-  if (_controlToken) return _controlToken;
-  try {
-    const res = await fetch(`${API_BASE}/health`);
-    if (res.ok) {
-      const data = await res.json();
-      _controlToken = data.token || null;
-    }
-  } catch (_) {}
-  return _controlToken;
-};
-
-const _post = async (path, body = {}, withToken = false) => {
+const _post = async (path, body = {}) => {
   const headers = { 'Content-Type': 'application/json' };
-  if (withToken) {
-    const tok = await _fetchToken();
-    if (tok) headers['X-Control-Token'] = tok;
-  }
   return fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers,
@@ -62,13 +40,13 @@ export const invoke = async (command, args) => {
     }
 
     case 'start_engine': {
-      const res = await _post('/engine/start', args || {}, true);
+      const res = await _post('/engine/start', args || {});
       const data = await res.json();
       return JSON.stringify(data);
     }
 
     case 'stop_engine': {
-      const res = await _post('/engine/stop', args || {}, true);
+      const res = await _post('/engine/stop', args || {});
       const data = await res.json();
       return JSON.stringify(data);
     }
@@ -79,4 +57,4 @@ export const invoke = async (command, args) => {
   }
 };
 
-export const getControlToken = _fetchToken;
+export const getControlToken = async () => null;

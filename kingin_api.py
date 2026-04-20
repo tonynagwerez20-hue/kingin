@@ -26,8 +26,7 @@ PROJECT_ROOT = Path(__file__).parent
 _engine_process: Optional[subprocess.Popen] = None
 _engine_start_time: Optional[float] = None
 
-import secrets as _secrets
-_CONTROL_TOKEN = os.environ.get("KINGIN_API_TOKEN") or _secrets.token_hex(16)
+_CONTROL_TOKEN = os.environ.get("KINGIN_API_TOKEN") or "replit-local-control"
 
 app = FastAPI(title="KingIn Dashboard API", version="1.0.0")
 
@@ -261,7 +260,7 @@ def _check_token(request: Request) -> bool:
 
 @app.get("/health")
 async def health():
-    return JSONResponse({"status": "ok", "time": time.time(), "token": _CONTROL_TOKEN})
+    return JSONResponse({"status": "ok", "time": time.time()})
 
 
 @app.post("/engine/init")

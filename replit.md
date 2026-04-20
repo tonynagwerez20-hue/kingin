@@ -16,7 +16,7 @@ kingin-vite/          ← Main web app (Vite + React, runs in browser)
     hooks/            - useWebSocket, useAppStore
     lib/              - formatters, mockData
     store/            - Zustand app state
-  vite.config.js      - Dev server config; proxies /api/* → port 8080
+  vite.config.js      - Dev server config; proxies /api/* → localhost-only API on port 8080
 
 kingin_api.py         ← KingIn Dashboard API Server (port 8080)
   GET  /engine/state  - Live engine state (balance, equity, positions, signals)
@@ -44,7 +44,9 @@ The Vite proxy routes `/api/*` requests to the API server, so the frontend never
 
 ## Key Notes
 - Originally a Tauri desktop app; adapted for web by replacing `@tauri-apps/api/tauri` with `src/tauri-stub.js`
-- `tauri-stub.js` now makes real HTTP calls to the KingIn API server (not mock data)
+- `tauri-stub.js` now makes real relative `/api` HTTP calls to the KingIn API server (not mock data)
+- Backend control tokens are not exposed to browser JavaScript; the local Vite proxy strips incoming control-token headers and injects the server-side token for engine start/stop requests
+- `master` contains local Windows desktop/browser scripts, not a complete Tauri native desktop app project
 - The API server reads live data from `data/hedge.db` (MT5 balance/trades) and `storage/logs/audit.json` (signals)
 - When no MT5 connection exists, the dashboard falls back gracefully to illustrative mock data
 - Auto-logs in with a demo session token (login auth is a separate planned task)

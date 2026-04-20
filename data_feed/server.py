@@ -84,7 +84,6 @@ log_dir.mkdir(parents=True, exist_ok=True)
 sys.stdout = LoggerWriter(log_dir / "server_live.log")
 sys.stderr = sys.stdout
 
-<<<<<<< HEAD
 import logging
 logging.basicConfig(
     level=logging.INFO,
@@ -172,15 +171,6 @@ async def lifespan(app: FastAPI):
             yield
 
     elif mode == "CSV" and CSVBatchProcessor:
-=======
-
-# Forward declaration of lifespan for FastAPI
-async def lifespan(app: FastAPI):
-    # Determine Mode
-    mode = get_env("DATA_SOURCE_TYPE", "CSV") # Default to CSV now as per user request
-    
-    if mode == "CSV" and CSVBatchProcessor:
->>>>>>> replit-agent
         print("[Server] Starting in CSV Mode (Multi-File)")
         
         # Define files to watch (Hardcoded default or ENV)
@@ -515,7 +505,6 @@ async def get_latest_tick():
     dq = ohlc_buffers.get("M5")
     if dq and len(dq) > 0:
         last = dq[-1]
-<<<<<<< HEAD
         raw_ts = last.get("time", time.time())
         # pandas Timestamp (and similar) are not JSON-serializable – convert to float epoch
         if hasattr(raw_ts, "timestamp"):
@@ -525,19 +514,13 @@ async def get_latest_tick():
                 raw_ts = float(raw_ts)
             except (TypeError, ValueError):
                 raw_ts = time.time()
-=======
->>>>>>> replit-agent
         return JSONResponse({
             "price": last.get("close", 0),
             "bid": latest_tick.get("bid", last.get("close", 0) - 0.75),
             "ask": latest_tick.get("ask", last.get("close", 0) + 0.75),
             "volume": last.get("volume", 0),
             "delta": last.get("delta", 0),
-<<<<<<< HEAD
             "timestamp": raw_ts,
-=======
-            "timestamp": last.get("time", time.time()),
->>>>>>> replit-agent
             "symbol": "XAUUSD"
         })
     
@@ -557,24 +540,15 @@ async def debug_buffers():
 @app.get("/status/detailed")
 async def get_detailed_status():
     """Returns comprehensive system status with connection details and uptime."""
-<<<<<<< HEAD
     mode = _get_current_mode()
     current_time = time.time()
     
     # 1. Feed Connection Details
     feed_status = {
-=======
-    mode = get_env("DATA_SOURCE_TYPE", "CSV")
-    current_time = time.time()
-    
-    # 1. DTC Connection Details
-    dtc_status = {
->>>>>>> replit-agent
         "connected": False,
         "synced": False,
         "uptime": 0,
         "last_heartbeat": 0,
-<<<<<<< HEAD
         "mode": mode
     }
     
@@ -603,32 +577,6 @@ async def get_detailed_status():
     broker_status = {
         "connected": False,
         "last_sync": 0,
-=======
-        "host": get_env("SIERRA_DTC_HOST", "127.0.0.1"),
-        "port": int(get_env("SIERRA_DTC_PORT", 11099)),
-        "symbol": get_env("SIERRA_SYMBOL", "XAUUSD")
-    }
-    
-    if mode == "DTC" and dtc_client_instance:
-        dtc_status["connected"] = dtc_client_instance.running
-        dtc_status["synced"] = dtc_client_instance.is_synced
-        dtc_status["last_heartbeat"] = dtc_client_instance.last_live_hb
-        if hasattr(dtc_client_instance, '_start_time'):
-            dtc_status["uptime"] = current_time - dtc_client_instance._start_time
-    elif mode == "CSV":
-        dq = ohlc_buffers.get("M5")
-        if dq and len(dq) > 0:
-            last_time = dq[-1].get("time", 0)
-            if current_time - last_time < 300:
-                dtc_status["connected"] = True
-                dtc_status["synced"] = True
-    
-    # 2. MT5 Bridge Details
-    mt5_status = {
-        "connected": False,
-        "last_heartbeat": 0,
-        "uptime": 0,
->>>>>>> replit-agent
         "socket_status": "UNKNOWN"
     }
     
@@ -641,7 +589,6 @@ async def get_detailed_status():
             sync_row = cursor.fetchone()
             if sync_row:
                 last_sync = float(sync_row[0])
-<<<<<<< HEAD
                 broker_status["last_sync"] = last_sync
                 if current_time - last_sync < 120:
                     broker_status["connected"] = True
@@ -657,46 +604,6 @@ async def get_detailed_status():
             "status": "OK",
             "uptime": current_time - server_start_time
         },
-=======
-                mt5_status["last_heartbeat"] = last_sync
-                if current_time - last_sync < 120:
-                    mt5_status["connected"] = True
-                    mt5_status["socket_status"] = "ACTIVE"
-            conn.close()
-        except Exception as e:
-            print(f"[Server] Detailed status DB error: {e}")
-    
-    # 3. Engine Details
-    engine_status = {
-        "status": "OK",
-        "uptime": current_time - server_start_time,
-        "last_signal_time": 0
-    }
-    
-    audit_path = project_root / "storage" / "logs" / "audit.json"
-    if audit_path.exists():
-        try:
-            with open(audit_path, "r") as f:
-                logs = json.load(f)
-                if logs:
-                    last_event = logs[-1]
-                    # Try to parse timestamp if available
-                    ts_str = last_event.get("timestamp", "")
-                    if ts_str:
-                        try:
-                            from datetime import datetime
-                            dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                            engine_status["last_signal_time"] = dt.timestamp()
-                        except:
-                            pass
-        except:
-            pass
-    
-    return JSONResponse({
-        "dtc": dtc_status,
-        "mt5": mt5_status,
-        "engine": engine_status,
->>>>>>> replit-agent
         "server_uptime": current_time - server_start_time
     })
 
@@ -825,7 +732,6 @@ async def get_realtime_market():
         "symbol": "XAUUSD"
     })
  
-<<<<<<< HEAD
 def _get_current_mode() -> str:
     """Helper to detect mode from config or env."""
     config_path = project_root / "config" / "trading_params_lite.json"
@@ -851,25 +757,10 @@ async def get_status():
         feed_health = "OK" if dtc_client_instance.running else "DISCONNECTED"
         is_synced = dtc_client_instance.is_synced
     elif mode in ["CSV", "MT5"] or mode != "DTC":
-=======
-@app.get("/status")
-async def get_status():
-    """Returns the current system status, including mode, sync state, balance, and component health."""
-    mode = get_env("DATA_SOURCE_TYPE", "CSV")
-    
-    # 1. Sierra Health
-    sierra_health = "DISCONNECTED"
-    is_synced = False
-    if mode == "DTC" and dtc_client_instance:
-        sierra_health = "OK" if dtc_client_instance.running else "DISCONNECTED"
-        is_synced = dtc_client_instance.is_synced
-    elif mode == "CSV":
->>>>>>> replit-agent
          # Check if we have recent data in buffers
          dq = ohlc_buffers.get("M5")
          if dq and len(dq) > 0:
              last_time = dq[-1].get("time", 0)
-<<<<<<< HEAD
              if hasattr(last_time, "timestamp"):
                  last_time = last_time.timestamp()
              else:
@@ -878,10 +769,6 @@ async def get_status():
                  
              if time.time() - last_time < 300: # Within 5 mins
                  feed_health = "OK"
-=======
-             if time.time() - last_time < 300: # Within 5 mins
-                 sierra_health = "OK"
->>>>>>> replit-agent
                  is_synced = True
 
     # 2. MT5 / Bridge Health & Balance
@@ -909,7 +796,6 @@ async def get_status():
             print(f"[Server] Status DB error: {e}")
 
     # 3. Engine Health
-<<<<<<< HEAD
     engine_health = "OK"
     
     return JSONResponse({
@@ -921,32 +807,6 @@ async def get_status():
             "feed": feed_health,
             "engine": engine_health,
             "broker_sync": mt5_health
-=======
-    # If the server is running, the API is up. 
-    # We check if there are recent audit events for strategy.
-    engine_health = "OK"
-    audit_path = project_root / "storage" / "logs" / "audit.json"
-    if audit_path.exists():
-        try:
-            with open(audit_path, "r") as f:
-                logs = json.load(f)
-                if logs:
-                    last_event = logs[-1]
-                    # Convert timestamp string to epoch if possible for staleness check
-                    # For now just assume OK if server is reachable and logs exist.
-                    pass
-        except: pass
-
-    return JSONResponse({
-        "mode": mode,
-        "is_synced": is_synced,
-        "state": "ACTIVE" if sierra_health == "OK" else "INITIALIZING",
-        "balance": balance,
-        "health": {
-            "sierra": sierra_health,
-            "engine": engine_health,
-            "mt5": mt5_health
->>>>>>> replit-agent
         }
     })
 

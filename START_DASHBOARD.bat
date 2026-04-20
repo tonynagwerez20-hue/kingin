@@ -1,14 +1,7 @@
 @echo off
 TITLE Institutional Trading System - Dashboard
-<<<<<<< HEAD
 SET "PROJECT_DIR=%~dp0"
-SET "STREAMLIT_EXE=%PROJECT_DIR%.venv_v2\Scripts\streamlit.exe"
 SET "APP_PY=%PROJECT_DIR%dashboard\dashboard_app.py"
-=======
-SET "PROJECT_DIR=e:\s.y.s.t.e.m"
-SET "STREAMLIT_EXE=%PROJECT_DIR%\.venv\Scripts\streamlit.exe"
-SET "APP_PY=%PROJECT_DIR%\dashboard\dashboard_app.py"
->>>>>>> replit-agent
 
 echo ==========================================================
 echo    INSTITUTIONAL TRADING SYSTEM - DASHBOARD
@@ -17,21 +10,22 @@ echo Starting Premium Dashboard...
 echo Dashboard Path: %APP_PY%
 echo.
 
-:: Check if streamlit exists
-if not exist "%STREAMLIT_EXE%" (
-    echo [ERROR] Virtual environment or Streamlit not found at %STREAMLIT_EXE%
-    echo Please ensure the venv is created and dependencies are installed.
+where streamlit >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Streamlit was not found in PATH.
+    echo Run SETUP_PROJECT.bat first to install dependencies.
     pause
-    exit /b
+    exit /b 1
 )
 
-:: Run the dashboard
+if not exist "%APP_PY%" (
+    echo [ERROR] Dashboard file not found: %APP_PY%
+    pause
+    exit /b 1
+)
+
 cd /d "%PROJECT_DIR%"
-<<<<<<< HEAD
 streamlit run "%APP_PY%"
-=======
-"%STREAMLIT_EXE%" run "%APP_PY%"
->>>>>>> replit-agent
 
 if %ERRORLEVEL% neq 0 (
     echo.

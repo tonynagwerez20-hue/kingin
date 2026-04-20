@@ -1,78 +1,62 @@
 @echo off
 setlocal
 
-echo Building Institutional Trading System Desktop App...
+set "PROJECT_DIR=%~dp0"
+set "FRONTEND_DIR=%PROJECT_DIR%kingin-vite"
+
+cd /d "%PROJECT_DIR%"
+
+echo Building KingIn desktop dashboard assets...
 echo.
 
-cd /d "%~dp0"
-
-rem --- Quick environment checks ---
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo ERROR: Node.js not found in PATH. Install Node 18+.
+    echo ERROR: Node.js not found in PATH. Install Node.js 18 or newer.
     pause
     exit /b 1
 )
 
 where npm >nul 2>nul
 if %errorlevel% neq 0 (
-    echo ERROR: npm not found in PATH. Ensure npm is installed.
+    echo ERROR: npm not found in PATH. Reinstall Node.js with npm enabled.
     pause
     exit /b 1
 )
 
-where cargo >nul 2>nul
-if %errorlevel% neq 0 (
-    echo WARNING: Rust/cargo not found. Tauri build may fail or be skipped.
-    set "RUST_FOUND=0"
-) else (
-    set "RUST_FOUND=1"
+if not exist "%FRONTEND_DIR%\package.json" (
+    echo ERROR: React dashboard package not found at %FRONTEND_DIR%.
+    pause
+    exit /b 1
 )
 
-echo Installing JS dependencies (using npm ci for reproducible installs)...
-call npm ci
+cd /d "%FRONTEND_DIR%"
+
+if exist package-lock.json (
+    echo Installing JavaScript dependencies with npm ci...
+    call npm ci
+) else (
+    echo Installing JavaScript dependencies with npm install...
+    call npm install
+)
 if %errorlevel% neq 0 (
-    echo ERROR: Failed to install JS dependencies (npm ci)
+    echo ERROR: Failed to install JavaScript dependencies.
     pause
     exit /b 1
 )
 
 echo.
-echo Building React app (production)...
+echo Building production dashboard...
 call npm run build
 if %errorlevel% neq 0 (
-    echo ERROR: Failed to build React app
+    echo ERROR: Failed to build the React dashboard.
     pause
     exit /b 1
 )
 
 echo.
-if "%RUST_FOUND%"=="1" (
-    echo Building Tauri desktop app (requires Rust toolchain)...
-    call npm run tauri:build
-    if %errorlevel% neq 0 (
-        echo ERROR: Failed to build Tauri app
-        pause
-        exit /b 1
-    )
-) else (
-    echo Skipping Tauri build because Rust/cargo was not found.
-)
-
-echo.
-echo Creating desktop shortcut (if helper exists)...
-if exist create_shortcut.bat (
-    call create_shortcut.bat
-    if %errorlevel% neq 0 (
-        echo WARNING: Failed to create shortcut, but build steps completed.
-    )
-) else (
-    echo create_shortcut.bat not found; skipping shortcut creation.
-)
-
-echo.
-echo Build complete! If Tauri was built, check src-tauri\target\release for the installer/executable.
-echo Desktop shortcut should be available on your desktop if creation succeeded.
+echo Build complete.
+echo Dashboard output: %FRONTEND_DIR%\dist
+echo Use LAUNCH_DESKTOP_APP.bat for local desktop/browser operation.
 
 endlocal
 pause

@@ -1,36 +1,41 @@
 @echo off
-REM Auto-launch script for Hedge Trading System Dashboard
-REM This batch file starts both the backend server and React dashboard
+setlocal
 
-echo === Hedge Trading System - Auto Launch ===
+SET "PROJECT_DIR=%~dp0"
+SET "FRONTEND_DIR=%PROJECT_DIR%kingin-vite"
+
+if defined ITS_PYTHON_EXE (
+    SET "PYTHON_EXE=%ITS_PYTHON_EXE%"
+) else (
+    SET "PYTHON_EXE=python"
+)
+
+echo === KingIn Dashboard - Auto Launch ===
 echo.
 
-REM Start FastAPI server in background
-echo [1/3] Starting FastAPI backend server...
-<<<<<<< HEAD
-start "Hedge API Server" cmd /k "cd /d %~dp0 && .\.venv_v2\Scripts\python.exe data_feed\server.py"
-=======
-start "Hedge API Server" cmd /k "cd /d %~dp0 && python data_feed\server.py"
->>>>>>> replit-agent
+if not exist "%FRONTEND_DIR%\package.json" (
+    echo [ERROR] Dashboard package not found at %FRONTEND_DIR%.
+    pause
+    exit /b 1
+)
+
+echo [1/3] Starting KingIn API server...
+start "KingIn API Server" cmd /k "cd /d ""%PROJECT_DIR%"" && ""%PYTHON_EXE%"" kingin_api.py"
 timeout /t 5 /nobreak > nul
 
-REM Start React development server
 echo [2/3] Starting React dashboard...
-<<<<<<< HEAD
-start "Hedge Dashboard" cmd /k "cd /d %~dp0dashboard-react && ..\.venv_v2\Scripts\python.exe -m http.server 3000"
-=======
-start "Hedge Dashboard" cmd /k "cd /d %~dp0dashboard-react && npm run dev"
->>>>>>> replit-agent
-timeout /t 10 /nobreak > nul
+start "KingIn Dashboard" cmd /k "cd /d ""%FRONTEND_DIR%"" && npm install --prefer-offline && npm run dev"
+timeout /t 8 /nobreak > nul
 
-REM Open dashboard in default browser
 echo [3/3] Opening dashboard in browser...
-start http://localhost:3000
+start "" "http://localhost:5000"
 
 echo.
-echo Dashboard launched successfully!
-echo   Dashboard URL: http://localhost:3000
-echo   API Server: http://localhost:8000
+echo Dashboard launched.
+echo   Dashboard URL: http://localhost:5000
+echo   API Server: http://127.0.0.1:8080
 echo.
-echo Press any key to close this window (servers will continue running)...
+echo Press any key to close this launcher window. Servers continue in their own windows.
 pause > nul
+
+endlocal

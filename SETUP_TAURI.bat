@@ -1,107 +1,77 @@
 @echo off
-REM ============================================================================
-REM INSTITUTIONAL TRADING SYSTEM - SETUP SCRIPT
-REM ============================================================================
-REM 
-REM This script sets up the Tauri v2 + React desktop application.
-REM 
-REM PREREQUISITES:
-REM - Node.js 18+ (https://nodejs.org)
-REM - Rust (https://rustup.rs)
-REM 
-REM USAGE:
-REM 1. Install Node.js and Rust first
-REM 2. Run this script: SETUP_TAURI.bat
-REM 
-REM ============================================================================
+setlocal
 
+set "PROJECT_DIR=%~dp0"
+set "FRONTEND_DIR=%PROJECT_DIR%kingin-vite"
+
+cd /d "%PROJECT_DIR%"
+
+echo KingIn local desktop setup
 echo.
-echo ================================================================
-echo Institutional Trading System - Tauri Setup
-echo ================================================================
+echo This master branch does not contain a Tauri native-app project.
+echo It runs as a local Windows desktop/browser dashboard backed by the Python API.
 echo.
 
-REM Check Node.js
-echo Checking Node.js...
-node --version >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Node.js not found. Please install Node.js 18+ from https://nodejs.org
-    pause
-    exit /b 1
-)
-echo Node.js found:
-
-REM Check Rust
-echo Checking Rust...
-rustc --version >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Rust not found. Please install Rust from https://rustup.rs
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    echo ERROR: Node.js not found. Install Node.js 18 or newer from https://nodejs.org
     pause
     exit /b 1
 )
 
-echo Setting Rust default toolchain to stable to prevent compilation errors...
-rustup default stable
-
-REM Check Microsoft C++ Build Tools (Linker)
-echo Checking for Windows C++ Build Tools...
-if not exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
-    echo [ERROR] Microsoft Desktop C++ Compiler is MISSING!
-    echo The native desktop application cannot be compiled without it.
-    echo Please right-click "INSTALL_CPP_TOOLS_ADMIN.ps1" and select "Run with PowerShell" as Administrator.
+where npm >nul 2>nul
+if %errorlevel% neq 0 (
+    echo ERROR: npm not found. Reinstall Node.js with npm enabled.
     pause
     exit /b 1
 )
-echo Rust and Windows Native Linker look ready!
 
-REM Install npm dependencies
-echo.
-echo Installing npm dependencies...
-call npm install
-if errorlevel 1 (
-    echo [ERROR] npm install failed
+python --version >nul 2>nul
+if %errorlevel% neq 0 (
+    echo ERROR: Python is not installed or not in PATH.
+    echo Install Python 3.10 or newer and tick Add Python to PATH.
     pause
     exit /b 1
 )
-echo Dependencies installed
 
-REM Generate icons
-echo.
-echo Generating icons...
-call node generate_icon.js
-if errorlevel 1 (
-    echo [ERROR] Icon generation failed
+echo Installing Python dependencies...
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+if %errorlevel% neq 0 (
+    echo ERROR: Python dependency installation failed.
     pause
     exit /b 1
 )
-echo Icons generated
 
-REM Build frontend
-echo.
-echo Building frontend...
+if not exist "%FRONTEND_DIR%\package.json" (
+    echo ERROR: React dashboard package not found at %FRONTEND_DIR%.
+    pause
+    exit /b 1
+)
+
+cd /d "%FRONTEND_DIR%"
+echo Installing dashboard dependencies...
+if exist package-lock.json (
+    call npm ci
+) else (
+    call npm install
+)
+if %errorlevel% neq 0 (
+    echo ERROR: Dashboard dependency installation failed.
+    pause
+    exit /b 1
+)
+
 call npm run build
-if errorlevel 1 (
-    echo [ERROR] Frontend build failed
+if %errorlevel% neq 0 (
+    echo ERROR: Dashboard build failed.
     pause
     exit /b 1
 )
-echo Frontend built
 
-REM Build Tauri app
 echo.
-echo Building Tauri application...
-call npm run tauri:build
-if errorlevel 1 (
-    echo [ERROR] Tauri build failed
-    pause
-    exit /b 1
-)
-echo.
+echo Setup complete.
+echo Run LAUNCH_DESKTOP_APP.bat to start the local desktop dashboard.
 
-echo ================================================================
-echo BUILD COMPLETE
-echo ================================================================
-echo.
-echo The executable is in: src-tauri\target\release\
-echo.
+endlocal
 pause

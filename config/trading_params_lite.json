@@ -2,9 +2,9 @@
     "pipeline": {
         "data_provider": {
             "config": {
-                "login": 105659532,
-                "password": "7(Mj<GOp",
-                "server": "FBS-Demo",
+                "login": null,
+                "password": "",
+                "server": null,
                 "broker": null,
                 "auto_detect": true,
                 "balance": null,
