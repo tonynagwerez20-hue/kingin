@@ -1,0 +1,2 @@
+cargo:rustc-link-search=native=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\build\webview2-com-sys-c3f8aa8e03645aab\out\x64
+cargo:rustc-link-lib=advapi32

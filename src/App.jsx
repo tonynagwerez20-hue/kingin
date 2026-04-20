@@ -1,10 +1,10 @@
 // App.jsx - Main application shell
-// Handles authentication state and renders Login or Dashboard
+// Handles authentication state and renders Login or KingIn Dashboard
 
 import { useState, useEffect } from 'react';
 import Login from './Login.jsx';
-import Dashboard from './Dashboard.jsx';
-import './styles.css';
+import KingInDashboard from './KingInDashboard.jsx';
+import './kingin.css';
 
 const App = () => {
   const [sessionToken, setSessionToken] = useState(null);
@@ -12,23 +12,11 @@ const App = () => {
 
   // Check session on mount
   useEffect(() => {
-    const token = sessionStorage.getItem('session_token');
-    const sessionTime = sessionStorage.getItem('session_time');
-    
-    if (token && sessionTime) {
-      // Check if session expired (8 hours)
-      const sessionAge = Date.now() - parseInt(sessionTime);
-      const eightHours = 8 * 60 * 60 * 1000;
-      
-      if (sessionAge < eightHours) {
-        setSessionToken(token);
-      } else {
-        // Session expired
-        sessionStorage.removeItem('session_token');
-        sessionStorage.removeItem('session_time');
-      }
-    }
-    
+    // Auto-login for demo purposes
+    const demoToken = 'demo_session_' + Date.now();
+    sessionStorage.setItem('session_token', demoToken);
+    sessionStorage.setItem('session_time', Date.now().toString());
+    setSessionToken(demoToken);
     setLoading(false);
   }, []);
 
@@ -53,7 +41,7 @@ const App = () => {
 
   // Render based on authentication state
   return sessionToken ? (
-    <Dashboard sessionToken={sessionToken} onLogout={handleLogout} />
+    <KingInDashboard sessionToken={sessionToken} onLogout={handleLogout} />
   ) : (
     <Login onLogin={handleLogin} />
   );

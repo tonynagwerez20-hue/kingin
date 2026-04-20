@@ -1,12 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
 use tauri::AppHandle;
 use tauri_plugin_shell::ShellExt;
 
 /// Read engine_state.json from executable directory
-#[tauri::command]
 pub fn read_engine_state() -> Result<String, String> {
     // Attempt to locate engine_state.json from several likely locations.
     // Prefer an explicit env var `ITS_STATE_PATH` when present.
@@ -69,7 +66,7 @@ pub fn read_engine_state() -> Result<String, String> {
 }
 
 /// Write dashboard command to JSON file
-#[tauri::command]
+
 pub fn write_dashboard_command(command: String) -> Result<(), String> {
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Failed to get executable path: {}", e))?;
@@ -135,7 +132,6 @@ pub async fn init_mt5_backend(_app: AppHandle) -> Result<String, String> {
     }
 }
 
-#[tauri::command]
 pub async fn auth_mt5(app: AppHandle, account: String, password: String, server: String, save_pwd: bool) -> Result<String, String> {
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Failed to get executable path: {}", e))?;
@@ -230,7 +226,6 @@ pub async fn auth_mt5(app: AppHandle, account: String, password: String, server:
     Err(last_error)
 }
 
-#[tauri::command]
 pub async fn start_engine(app: AppHandle) -> Result<String, String> {
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Failed to get executable path: {}", e))?;
@@ -254,7 +249,6 @@ pub async fn start_engine(app: AppHandle) -> Result<String, String> {
     Ok("Engine start requested".to_string())
 }
 
-#[tauri::command]
 pub async fn stop_engine(app: AppHandle) -> Result<String, String> {
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Failed to get executable path: {}", e))?;
@@ -279,18 +273,3 @@ pub async fn stop_engine(app: AppHandle) -> Result<String, String> {
     Ok(String::from_utf8(output.stdout).unwrap_or_else(|_| "Stopped".to_string()))
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![
-            read_engine_state,
-            write_dashboard_command,
-            init_mt5_backend,
-            auth_mt5,
-            start_engine,
-            stop_engine
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
-}

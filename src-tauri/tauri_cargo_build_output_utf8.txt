@@ -1,0 +1,262 @@
+﻿﻿cargo :    Compiling proc-macro2 v1.0.106
+At line:1 char:164
++ ... ErrorAction SilentlyContinue }; cargo build --release -v 2>&1 | Tee-O ...
++                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling proc-macro2 v1.0.106 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling cfg-if v1.0.4
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name cfg_if --edition=2018 C:\Users\LENOVO\.cargo\registr
+y\src\index.crates.io-1949cf8c6b5b557f\cfg-if-1.0.4\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, 
+values(\"core\", \"rustc-dep-of-std\"))" -C metadata=195f6166e8744792 -C 
+extra-filename=-84982d615b71f97a --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name unicode_ident --edition=2021 C:\Users\LENOVO\.cargo\
+registry\src\index.crates.io-1949cf8c6b5b557f\unicode-ident-1.0.24\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, 
+values())" -C metadata=f4759285dc2f593f -C extra-filename=-8645935009dfe633 
+--out-dir C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+-C strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name build_script_build --edition=2021 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\proc-macro2-1.0.106\build.rs
+ --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type bin --emit=dep-info,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"default\"" --cfg 
+"feature=\"proc-macro\"" --cfg "feature=\"span-locations\"" --check-cfg 
+cfg(docsrs,test) --check-cfg "cfg(feature, values(\"default\", \"nightly\", 
+\"proc-macro\", \"span-locations\"))" -C metadata=d8fcf4d3a861bc8b -C 
+extra-filename=-a7b7a14852cd0d08 --out-dir C:\Users\LENOVO\Desktop\kingin-maste
+r\src-tauri\target\release\build\proc-macro2-a7b7a14852cd0d08 -C strip=symbols 
+-L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name build_script_build --edition=2021 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\quote-1.0.45\build.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type bin --emit=dep-info,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"default\"" --cfg 
+"feature=\"proc-macro\"" --check-cfg cfg(docsrs,test) --check-cfg 
+"cfg(feature, values(\"default\", \"proc-macro\"))" -C 
+metadata=8a379a11595748b6 -C extra-filename=-5b9ed403a8187700 --out-dir C:\User
+s\LENOVO\Desktop\kingin-master\src-tauri\target\release\build\quote-5b9ed403a81
+87700 -C strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+   Compiling serde_core v1.0.228
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name build_script_build --edition=2021 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\serde_core-1.0.228\build.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type bin --emit=dep-info,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"alloc\"" --cfg "feature=\"default\"" 
+--cfg "feature=\"result\"" --cfg "feature=\"std\"" --check-cfg 
+cfg(docsrs,test) --check-cfg "cfg(feature, values(\"alloc\", \"default\", 
+\"rc\", \"result\", \"std\", \"unstable\"))" -C metadata=a0c9cb3a651b0258 -C 
+extra-filename=-8aafedfb0c5dd061 --out-dir C:\Users\LENOVO\Desktop\kingin-maste
+r\src-tauri\target\release\build\serde_core-8aafedfb0c5dd061 -C strip=symbols 
+-L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+   Compiling zerocopy v0.8.48
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name build_script_build --edition=2021 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\zerocopy-0.8.48\build.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type bin --emit=dep-info,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"simd\"" --check-cfg cfg(docsrs,test) 
+--check-cfg "cfg(feature, 
+values(\"__internal_use_only_features_that_work_on_stable\", \"alloc\", 
+\"derive\", \"float-nightly\", \"simd\", \"simd-nightly\", \"std\", 
+\"zerocopy-derive\"))" -C metadata=c5b84ac9499545bb -C 
+extra-filename=-5aa084baa7f3e682 --out-dir C:\Users\LENOVO\Desktop\kingin-maste
+r\src-tauri\target\release\build\zerocopy-5aa084baa7f3e682 -C strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+     Running `C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\bu
+ild\serde_core-8aafedfb0c5dd061\build-script-build`
+     Running `C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\bu
+ild\proc-macro2-a7b7a14852cd0d08\build-script-build`
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name serde_core --edition=2021 C:\Users\LENOVO\.cargo\reg
+istry\src\index.crates.io-1949cf8c6b5b557f\serde_core-1.0.228\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"alloc\"" --cfg "feature=\"default\"" 
+--cfg "feature=\"result\"" --cfg "feature=\"std\"" --check-cfg 
+cfg(docsrs,test) --check-cfg "cfg(feature, values(\"alloc\", \"default\", 
+\"rc\", \"result\", \"std\", \"unstable\"))" -C metadata=3a06b41421ed4705 -C 
+extra-filename=-73f996ed5ba06746 --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow --check-cfg cfg(if_docsrs_then_no_serde_core) --check-cfg 
+cfg(no_core_cstr) --check-cfg cfg(no_core_error) --check-cfg cfg(no_core_net) 
+--check-cfg cfg(no_core_num_saturating) --check-cfg 
+cfg(no_diagnostic_namespace) --check-cfg cfg(no_serde_derive) --check-cfg 
+cfg(no_std_atomic) --check-cfg cfg(no_std_atomic64) --check-cfg 
+cfg(no_target_has_atomic)`
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name proc_macro2 --edition=2021 C:\Users\LENOVO\.cargo\re
+gistry\src\index.crates.io-1949cf8c6b5b557f\proc-macro2-1.0.106\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"default\"" --cfg 
+"feature=\"proc-macro\"" --cfg "feature=\"span-locations\"" --check-cfg 
+cfg(docsrs,test) --check-cfg "cfg(feature, values(\"default\", \"nightly\", 
+\"proc-macro\", \"span-locations\"))" -C metadata=dac0dee4935bf253 -C 
+extra-filename=-a442f5552cd50c74 --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--extern unicode_ident=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\r
+elease\deps\libunicode_ident-8645935009dfe633.rmeta --cap-lints allow --cfg 
+span_locations --cfg wrap_proc_macro --cfg proc_macro_span_location --cfg 
+proc_macro_span_file --check-cfg cfg(fuzzing) --check-cfg cfg(no_is_available) 
+--check-cfg cfg(no_literal_byte_character) --check-cfg 
+cfg(no_literal_c_string) --check-cfg cfg(no_source_text) --check-cfg 
+cfg(proc_macro_span) --check-cfg cfg(proc_macro_span_file) --check-cfg 
+cfg(proc_macro_span_location) --check-cfg cfg(procmacro2_backtrace) 
+--check-cfg cfg(procmacro2_build_probe) --check-cfg 
+cfg(procmacro2_nightly_testing) --check-cfg cfg(procmacro2_semver_exempt) 
+--check-cfg cfg(randomize_layout) --check-cfg cfg(span_locations) --check-cfg 
+cfg(super_unstable) --check-cfg cfg(wrap_proc_macro)`
+     Running `C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\bu
+ild\quote-5b9ed403a8187700\build-script-build`
+   Compiling getrandom v0.2.17
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name getrandom --edition=2018 C:\Users\LENOVO\.cargo\regi
+stry\src\index.crates.io-1949cf8c6b5b557f\getrandom-0.2.17\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"std\"" --check-cfg cfg(docsrs,test) 
+--check-cfg "cfg(feature, values(\"compiler_builtins\", \"core\", \"custom\", 
+\"js\", \"js-sys\", \"linux_disable_fallback\", \"rdrand\", 
+\"rustc-dep-of-std\", \"std\", \"test-in-browser\", \"wasm-bindgen\"))" -C 
+metadata=ee145b8f740e9c70 -C extra-filename=-26a0ca0e3e1cd2cd --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--extern cfg_if=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\
+deps\libcfg_if-84982d615b71f97a.rmeta --cap-lints allow`
+     Running `C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\bu
+ild\zerocopy-5aa084baa7f3e682\build-script-build`
+   Compiling rand_core v0.6.4
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name rand_core --edition=2018 C:\Users\LENOVO\.cargo\regi
+stry\src\index.crates.io-1949cf8c6b5b557f\rand_core-0.6.4\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"alloc\"" --cfg "feature=\"getrandom\"" 
+--cfg "feature=\"std\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, 
+values(\"alloc\", \"getrandom\", \"serde\", \"serde1\", \"std\"))" -C 
+metadata=7a6363bf14dc3f35 -C extra-filename=-32a754e20bf0beb1 --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--extern getrandom=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\relea
+se\deps\libgetrandom-26a0ca0e3e1cd2cd.rmeta --cap-lints allow`
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name zerocopy --edition=2021 C:\Users\LENOVO\.cargo\regis
+try\src\index.crates.io-1949cf8c6b5b557f\zerocopy-0.8.48\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"simd\"" --check-cfg cfg(docsrs,test) 
+--check-cfg "cfg(feature, 
+values(\"__internal_use_only_features_that_work_on_stable\", \"alloc\", 
+\"derive\", \"float-nightly\", \"simd\", \"simd-nightly\", \"std\", 
+\"zerocopy-derive\"))" -C metadata=31b16bb04751e3e8 -C 
+extra-filename=-9d854b8045e1014c --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow --check-cfg cfg(no_zerocopy_simd_x86_avx12_1_89_0) 
+--check-cfg "cfg(rust, values(\"1.89.0\"))" --check-cfg 
+cfg(no_zerocopy_core_error_1_81_0) --check-cfg "cfg(rust, values(\"1.81.0\"))" 
+--check-cfg cfg(no_zerocopy_diagnostic_on_unimplemented_1_78_0) --check-cfg 
+"cfg(rust, values(\"1.78.0\"))" --check-cfg 
+cfg(no_zerocopy_generic_bounds_in_const_fn_1_61_0) --check-cfg "cfg(rust, 
+values(\"1.61.0\"))" --check-cfg cfg(no_zerocopy_target_has_atomics_1_60_0) 
+--check-cfg "cfg(rust, values(\"1.60.0\"))" --check-cfg 
+cfg(no_zerocopy_aarch64_simd_1_59_0) --check-cfg "cfg(rust, 
+values(\"1.59.0\"))" --check-cfg cfg(no_zerocopy_aarch64_simd_be_1_87_0) 
+--check-cfg "cfg(rust, values(\"1.87.0\"))" --check-cfg 
+cfg(no_zerocopy_panic_in_const_and_vec_try_reserve_1_57_0) --check-cfg 
+"cfg(rust, values(\"1.57.0\"))" --check-cfg cfg(doc_cfg) --check-cfg cfg(kani) 
+--check-cfg cfg(__ZEROCOPY_INTERNAL_USE_ONLY_NIGHTLY_FEATURES_IN_TESTS) 
+--check-cfg cfg(__ZEROCOPY_INTERNAL_USE_ONLY_DEV_MODE) --check-cfg 
+cfg(coverage_nightly) --check-cfg cfg(zerocopy_inline_always)`
+   Compiling icu_normalizer_data v2.2.0
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name build_script_build --edition=2021 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\icu_normalizer_data-2.2.0\bu
+ild.rs --error-format=json 
+--json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin 
+--emit=dep-info,link -C embed-bitcode=no --warn=unexpected_cfgs --check-cfg 
+cfg(icu4x_custom_data) -C debug-assertions=off --check-cfg cfg(docsrs,test) 
+--check-cfg "cfg(feature, values())" -C metadata=ae8b622c21c7ee85 -C 
+extra-filename=-3d07c88db7129801 --out-dir C:\Users\LENOVO\Desktop\kingin-maste
+r\src-tauri\target\release\build\icu_normalizer_data-3d07c88db7129801 -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+   Compiling icu_properties_data v2.2.0
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name build_script_build --edition=2021 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\icu_properties_data-2.2.0\bu
+ild.rs --error-format=json 
+--json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin 
+--emit=dep-info,link -C embed-bitcode=no --warn=unexpected_cfgs --check-cfg 
+cfg(icu4x_custom_data) -C debug-assertions=off --check-cfg cfg(docsrs,test) 
+--check-cfg "cfg(feature, values())" -C metadata=a1b5807fe68ee727 -C 
+extra-filename=-87c79770b7585b6f --out-dir C:\Users\LENOVO\Desktop\kingin-maste
+r\src-tauri\target\release\build\icu_properties_data-87c79770b7585b6f -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+   Compiling stable_deref_trait v1.2.1
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name stable_deref_trait --edition=2015 C:\Users\LENOVO\.c
+argo\registry\src\index.crates.io-1949cf8c6b5b557f\stable_deref_trait-1.2.1\src
+\lib.rs --error-format=json 
+--json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib 
+--emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off 
+--cfg "feature=\"alloc\"" --cfg "feature=\"default\"" --cfg "feature=\"std\"" 
+--check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"alloc\", 
+\"default\", \"std\"))" -C metadata=64edcfbf4d6edb19 -C 
+extra-filename=-6a203b5014821171 --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+   Compiling siphasher v1.0.2
+     Running `C:\Users\LENOVO\.rustup\toolchains\stable-x86_64-pc-windows-msvc\
+bin\rustc.exe --crate-name siphasher --edition=2018 C:\Users\LENOVO\.cargo\regi
+stry\src\index.crates.io-1949cf8c6b5b557f\siphasher-1.0.2\src\lib.rs 
+--error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat 
+--crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C 
+debug-assertions=off --cfg "feature=\"default\"" --cfg "feature=\"std\"" 
+--check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"default\", 
+\"serde\", \"serde_json\", \"serde_no_std\", \"serde_std\", \"std\"))" -C 
+metadata=1500a8df6c506e87 -C extra-filename=-a5ad591d60bb23c8 --out-dir 
+C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps -C 
+strip=symbols -L 
+dependency=C:\Users\LENOVO\Desktop\kingin-master\src-tauri\target\release\deps 
+--cap-lints allow`
+

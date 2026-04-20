@@ -37,6 +37,15 @@
       "icons/256x256.png",
       "icons/app-icon.png",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false,
+        "compression": "lzma",
+        "startMenuFolder": null
+      }
+    }
   }
 }
