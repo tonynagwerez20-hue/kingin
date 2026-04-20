@@ -836,7 +836,7 @@ const TradeHistoryPanel = () => {
                 <td><span className={`badge ${h.direction.toLowerCase()}`}>{h.direction}</span></td>
                 <td>{h.volume.toFixed(2)}</td>
                 <td>{formatPrice(h.openPrice, h.symbol === 'XAUUSD' ? 2 : 5)}</td>
-                <td>{formatPrice(h.closeClose, h.symbol === 'XAUUSD' ? 2 : 5)}</td>
+                <td>{formatPrice(h.closePrice, h.symbol === 'XAUUSD' ? 2 : 5)}</td>
                 <td className={`pnl-value ${h.pnl >= 0 ? 'positive' : 'negative'}`}>
                   {h.pnl >= 0 ? '+' : ''}{formatCurrency(h.pnl)}
                 </td>
