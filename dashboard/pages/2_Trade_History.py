@@ -64,9 +64,13 @@ if trades:
     df['Status'] = df['Status'].apply(lambda x: x.capitalize())
     filtered_df = df[df['Status'].isin(status_filter)]
 else:
+<<<<<<< HEAD
     columns = ["Ticket", "Symbol", "Action", "Entry", "Exit", "Lots", "PnL", "Status", "Time"]
     df = pd.DataFrame(columns=columns)
     filtered_df = pd.DataFrame(columns=columns)
+=======
+    filtered_df = pd.DataFrame(columns=["Ticket", "Symbol", "Action", "Entry", "Exit", "Lots", "PnL", "Status", "Time"])
+>>>>>>> replit-agent
 
 # Metrics
 col1, col2, col3 = st.columns(3)

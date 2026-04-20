@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Institutional Trading System - Core Dependencies
+=======
+# Production Dependencies
+>>>>>>> replit-agent
 fastapi
 uvicorn[standard]
 websockets
@@ -13,8 +17,11 @@ requests
 scipy
 numpy
 plotly
+<<<<<<< HEAD
 MetaTrader5
 rich
 cryptography
 click
 colorama
+=======
+>>>>>>> replit-agent

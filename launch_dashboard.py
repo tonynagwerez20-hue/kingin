@@ -36,6 +36,7 @@ def main():
     print("[2/3] Waiting for server to initialize...")
     time.sleep(5)
     
+<<<<<<< HEAD
     # Start dashboard server (simple HTTP server for static files)
     print("[3/3] Starting dashboard server...")
     dashboard_path = project_root / "dashboard-react"
@@ -49,6 +50,11 @@ def main():
     
     # Wait a moment for the dashboard server to start
     time.sleep(2)
+=======
+    # Check if React dev server is running, if not start it
+    print("[3/3] Launching dashboard in browser...")
+    dashboard_path = project_root / "dashboard-react"
+>>>>>>> replit-agent
     
     # Try to open the dashboard URL
     dashboard_url = "http://localhost:3000"
@@ -67,9 +73,13 @@ def main():
     except KeyboardInterrupt:
         print("\n\nShutting down...")
         server_process.terminate()
+<<<<<<< HEAD
         dashboard_process.terminate()
         server_process.wait()
         dashboard_process.wait()
+=======
+        server_process.wait()
+>>>>>>> replit-agent
         print("Server stopped.")
 
 if __name__ == "__main__":

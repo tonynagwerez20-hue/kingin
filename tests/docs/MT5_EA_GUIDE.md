@@ -71,11 +71,23 @@ The EA uses **direct DLL calls**. You only need two files:
 
 ### 1. Start Python System
 
+<<<<<<< HEAD
 1.  **Open Terminal**: Navigate to the project root.
 2.  **Run Setup** (New machines only): Run `SETUP_PROJECT.bat` to install global dependencies.
 3.  **Run Master Script**: Run `START_ALL.bat`.
 
 The system will automatically initialize the Data Server and the Strategy Engine. Look for the "v6.1 Breadcrumb" in the console.
+=======
+```powershell
+# Open terminal in project root
+cd e:\s.y.s.t.e.m
+
+# Start the system using the universal switch
+.\UNIVERSAL_CONTROL.bat
+```
+
+Verify ZeroMQ bridge is active on port 5555.
+>>>>>>> replit-agent
 
 ### 2. Attach EA to Chart
 

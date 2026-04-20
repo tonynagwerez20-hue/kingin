@@ -88,6 +88,7 @@ wmic cpu get loadpercentage
 2. Enable `database_batch_writes`
 3. Reduce logging frequency
 
+<<<<<<< HEAD
 ## 🛠 Stability Milestone (v6.1)
 The most critical performance improvement in v6.1 is the **Migration to Global Python 3.10**.
 - **Issue**: Virtual environments on this hardware configuration consistently trigger Exit Code `-1073741510`.
@@ -95,3 +96,10 @@ The most critical performance improvement in v6.1 is the **Migration to Global P
 
 ---
 *Last Updated: 2026-02-27 (v6.1 Maintenance)*
+=======
+## Reverting Optimizations
+To restore default (high-performance) settings, edit `config/performance.ini`:
+- Set `main_loop_interval_seconds = 5`
+- Set `buffer_max_size = 500`
+- Set `enable_periodic_cleanup = false`
+>>>>>>> replit-agent

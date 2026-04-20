@@ -1,8 +1,14 @@
 @echo off
 TITLE Institutional Trading System - Dashboard
+<<<<<<< HEAD
 SET "PROJECT_DIR=%~dp0"
 SET "STREAMLIT_EXE=%PROJECT_DIR%.venv_v2\Scripts\streamlit.exe"
 SET "APP_PY=%PROJECT_DIR%dashboard\dashboard_app.py"
+=======
+SET "PROJECT_DIR=e:\s.y.s.t.e.m"
+SET "STREAMLIT_EXE=%PROJECT_DIR%\.venv\Scripts\streamlit.exe"
+SET "APP_PY=%PROJECT_DIR%\dashboard\dashboard_app.py"
+>>>>>>> replit-agent
 
 echo ==========================================================
 echo    INSTITUTIONAL TRADING SYSTEM - DASHBOARD
@@ -21,7 +27,11 @@ if not exist "%STREAMLIT_EXE%" (
 
 :: Run the dashboard
 cd /d "%PROJECT_DIR%"
+<<<<<<< HEAD
 streamlit run "%APP_PY%"
+=======
+"%STREAMLIT_EXE%" run "%APP_PY%"
+>>>>>>> replit-agent
 
 if %ERRORLEVEL% neq 0 (
     echo.

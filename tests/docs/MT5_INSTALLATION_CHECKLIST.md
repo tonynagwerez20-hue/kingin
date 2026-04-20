@@ -70,7 +70,11 @@ HedgeEA.ex5 generated successfully
 ## Post-Installation Testing
 
 ### Test 1: Signal Reception
+<<<<<<< HEAD
 1. Start the Python system: Run `START_ALL.bat`.
+=======
+1. Start the Python system: Run `setup_env.bat` (first time) then `start_system.py`.
+>>>>>>> replit-agent
 2. Run the test script: `python tests/test_mt5_signals.py`.
 3. Check MT5 log for `[INFO] Processing signal: ...`.
 

@@ -48,6 +48,7 @@ Sierra Chart is only used for **data feed** in your system. The NTP sync error w
 
 ## Simplified Startup (MT5 Execution Mode)
 
+<<<<<<< HEAD
 ### Step 1: Start MetaTrader 5
 ```
 1. Open MT5
@@ -65,12 +66,47 @@ This script will automatically:
 2. Launch the **Data Feed Server** securely in the background.
 3. Launch the **Professional CLI Dashboard** in your current window.
 4. Begin acquiring Multi-Timeframe (MTF) Data and polling for signals.
+=======
+### Step 1: Start Sierra Chart (Normal Mode)
+```
+Just double-click SierraChart_64.exe
+No need for "Run as Administrator"
+```
+
+**Verify**:
+- DTC server shows "Listening on port 11099"
+- You can ignore the NTP error message
+
+### Step 2: Start MetaTrader 5
+```
+1. Open MT5
+2. Enable "Algo Trading" (green)
+3. Attach ZMQ Bridge EA to chart
+4. Verify smiley face 🙂
+```
+
+### Step 3: Start Python System
+```powershell
+# Terminal 1: Data Feed
+cd e:\s.y.s.t.e.m
+python data_feed/server.py
+
+# Terminal 2: Trading Engine
+cd e:\s.y.s.t.e.m
+python Engine/main_loop.py
+
+# Terminal 3: Dashboard
+cd e:\s.y.s.t.e.m
+streamlit run dashboard/dashboard_app.py
+```
+>>>>>>> replit-agent
 
 ---
 
 ## How It Works
 
 ```
+<<<<<<< HEAD
 MT5 Broker Data → Python Engine (MTF Analysis) 
      ↓                      ↓
  CLI Dashboard      Dynamic Risk Checks
@@ -103,6 +139,64 @@ Before running `START_ALL.bat`, verify:
 > [!NOTE]
 > Run `python verify_mt5_connection.py` to quickly confirm your MT5 connection is active before starting.
 
+=======
+Sierra Chart (Data) → Python Engine (Signals) → MT5 (Execution)
+     ↓                      ↓                        ↓
+  DTC Feed            Strategy Logic           Real Trades
+```
+
+**Data Flow**:
+1. Sierra Chart receives market data from broker/feed
+2. Python engine analyzes data and generates signals
+3. MT5 executes trades via ZMQ bridge
+4. Dashboard shows everything in real-time
+
+---
+
+## If NTP Error Bothers You (Optional Fix)
+
+If you want to remove the error message from Sierra Chart logs:
+
+### Option A: Run as Administrator (One-Time Setup)
+1. Right-click `SierraChart_64.exe`
+2. Select "Properties"
+3. Go to "Compatibility" tab
+4. ✅ Check "Run this program as an administrator"
+5. Click OK
+
+Now Sierra Chart will always run with admin rights when you double-click it.
+
+### Option B: Disable NTP Sync
+1. In Sierra Chart: `Global Settings` → `General Settings`
+2. Find "NTP Time Synchronization"
+3. Uncheck "Enable NTP Time Synchronization"
+4. Click OK
+
+This stops Sierra Chart from trying to sync time (and stops the error).
+
+---
+
+## Verify Your Setup
+
+Run the diagnostic:
+```powershell
+python tests/diag_system_health.py
+```
+
+**Expected for MT5 Execution Mode**:
+```
+✅ DTC Live Port (11099): REACHABLE
+⚠️  DTC Login: SUCCESS (TradingIsSupported: 0 is OK)
+✅ MT5 Bridge: CONNECTED
+✅ Account Balance: $10,000.00
+✅ API Status: DTC
+✅ Latest Price: 2654.75
+```
+
+**Note**: `TradingIsSupported: 0` is **fine** because you're not trading through Sierra Chart!
+
+---
+>>>>>>> replit-agent
 
 ## What Actually Matters for Trading
 

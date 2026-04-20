@@ -39,6 +39,7 @@ Thumbs.db
 # MT5 Build stuff
 MQL5/Experts/*.ex5
 MQL5/Experts/*.ex4
+<<<<<<< HEAD
 
 # Large backtest data files (Do not push raw CSVs)
 data/backtest/
@@ -69,3 +70,5 @@ _install_readme.py
 # Actual password is entered at login and never written to disk
 # config/trading_params_lite.json is committed WITH password="" only
 node_modules
+=======
+>>>>>>> replit-agent
