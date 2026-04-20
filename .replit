@@ -38,19 +38,17 @@ waitForPort = 5000
 name = "KingIn API"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python kingin_api.py"
-waitForPort = 8080
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 8080
-externalPort = 8080
-exposeLocalhost = true
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
