@@ -27,7 +27,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash -c 'cd kingin-vite && npm run dev'"
+args = "bash -c 'cd kingin-vite && npm install --prefer-offline 2>/dev/null; npm run dev'"
 waitForPort = 5000
 
 [[ports]]
