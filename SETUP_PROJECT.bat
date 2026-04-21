@@ -18,22 +18,13 @@ if %ERRORLEVEL% neq 0 (
 )
 echo [OK] Python detected.
 
-:: 2. Setup Virtual Environment
-if not exist ".venv" (
-    echo [INFO] Creating Virtual Environment...
-    python -m venv .venv
-)
-echo [OK] Virtual Environment ready.
-
-:: 3. Install Python Dependencies
-echo [INFO] Installing Python libraries...
-call .venv\Scripts\activate
-:: Ensure pip exists in the virtual environment
-python -m ensurepip --default-pip >nul 2>&1
+:: 2. Install Python Dependencies (Global)
+echo [INFO] Installing Python libraries globally...
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.txt --user
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Python dependency installation failed.
+    echo Try running as Administrator if permissions are denied.
     pause
     exit /b
 )
