@@ -28,6 +28,8 @@ echo [OK] Virtual Environment ready.
 :: 3. Install Python Dependencies
 echo [INFO] Installing Python libraries...
 call .venv\Scripts\activate
+:: Ensure pip exists in the virtual environment
+python -m ensurepip --default-pip >nul 2>&1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 if %ERRORLEVEL% neq 0 (
