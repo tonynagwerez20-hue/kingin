@@ -203,6 +203,7 @@ class ModularBootstrapper:
                 "FVGDiscountLayer":         "Engine.igof.layers.smc.fvg.FVGDiscountLayer",
                 "MicroMSSLayer":            "Engine.igof.layers.smc.mss.MicroMSSLayer",
                 "NewsEventLayer":           "Engine.igof.layers.smc.news_layer.NewsEventLayer",
+                "MLFilterLayer":            "Engine.igof.layers.ml_layer.MLFilterLayer",
             }
 
             for name, enabled in lite_layers.items():
@@ -211,6 +212,15 @@ class ModularBootstrapper:
                         "class_path": layer_map[name],
                         "config": self.config.get("filters", {})
                     })
+            
+            # COMPULSORY: Ensure MLFilterLayer is always active
+            if "MLFilterLayer" not in [l.get("class_path", "").split(".")[-1] for l in layers_cfg]:
+                logger.info("[BOOTSTRAP] Injecting compulsory MLFilterLayer into pipeline.")
+                layers_cfg.append({
+                    "class_path": layer_map["MLFilterLayer"],
+                    "config": self.config.get("filters", {})
+                })
+
 
         loaded_layers = []
         for l_cfg in layers_cfg:

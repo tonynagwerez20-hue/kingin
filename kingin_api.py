@@ -9,6 +9,11 @@ Runs on port 8080. The Vite dev server proxies /api/* to this server.
 import asyncio
 import json
 import os
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
+
 import sqlite3
 import subprocess
 import sys
@@ -23,16 +28,45 @@ import uvicorn
 
 PROJECT_ROOT = Path(__file__).parent
 
+def _get_config_path() -> Path:
+    return PROJECT_ROOT / "config" / "trading_params_lite.json"
+
+@app.get("/api/system/status")
+async def get_system_status():
+    config_path = _get_config_path()
+    is_configured = False
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                cfg = json.load(f)
+                login = cfg.get("pipeline", {}).get("data_provider", {}).get("config", {}).get("login")
+                is_configured = bool(login)
+        except:
+            pass
+    return {"configured": is_configured}
+
 _engine_process: Optional[subprocess.Popen] = None
 _engine_start_time: Optional[float] = None
 
-_CONTROL_TOKEN = os.environ.get("KINGIN_API_TOKEN") or "replit-local-control"
+from utils.jwt import create_token, decode_token
+
+def _check_token(request: Request) -> bool:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return False
+    token = auth_header.split(" ", 1)[1]
+    payload = decode_token(token)
+    return bool(payload)
+
 
 app = FastAPI(title="KingIn Dashboard API", version="1.0.0")
 
 _ALLOWED_ORIGINS = [
     "http://localhost:5000",
     "http://127.0.0.1:5000",
+    "http://localhost:5173",  # Vite default
+    "app://.",               # Electron origin
+    "*",                     # Development fallback
 ]
 
 app.add_middleware(
@@ -42,6 +76,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.post("/api/login")
+async def login(request: Request):
+    """Simple JWT login against environment password."""
+    try:
+        body = await request.json()
+        password = body.get("password")
+        env_password = os.getenv("KINGIN_USER_PASSWORD")
+        
+        # In a real app, use hashed passwords. 
+        # For this requirement, we use the env-based manual password.
+        if env_password and password == env_password:
+            token = create_token("admin")
+            return JSONResponse({"success": True, "token": token})
+        else:
+            return JSONResponse({"success": False, "error": "Invalid password"}, status_code=401)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+
 
 
 def _get_db_path() -> Path:
@@ -115,7 +168,44 @@ def _read_db_state() -> dict:
     except Exception as e:
         print(f"[API] DB read error: {e}")
 
-    return state
+
+@app.get("/api/settings")
+async def get_settings(request: Request):
+    if not _check_token(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+    
+    config_path = _get_config_path()
+    if not config_path.exists():
+        return JSONResponse({"success": False, "error": "Config file not found"}, status_code=404)
+    
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        return JSONResponse(config)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+@app.post("/api/settings")
+async def update_settings(request: Request):
+    if not _check_token(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+    
+    try:
+        new_config = await request.json()
+        config_path = _get_config_path()
+        
+        # Load current config to merge or validate
+        with open(config_path, "r") as f:
+            current_config = json.load(f)
+        
+        # Update (shallow merge or replace sections as needed)
+        # For now, we'll allow replacing the whole config for simplicity in frontend
+        with open(config_path, "w") as f:
+            json.dump(new_config, f, indent=4)
+            
+        return JSONResponse({"success": True, "message": "Settings updated successfully"})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 def _read_audit_state() -> dict:
@@ -145,8 +235,23 @@ def _read_audit_state() -> dict:
         return state
 
     try:
-        with open(audit_path, "r") as f:
-            logs = json.load(f)
+        file_size = audit_path.stat().st_size
+        # If file is larger than 2MB, only read the last 1MB
+        if file_size > 2 * 1024 * 1024:
+            with open(audit_path, "rb") as f:
+                f.seek(-1 * 1024 * 1024, os.SEEK_END)
+                chunk = f.read().decode("utf-8", errors="ignore")
+                # Find the first valid '[' to start a JSON array fragment
+                start = chunk.find("[")
+                if start != -1:
+                    logs = json.loads(chunk[start:])
+                else:
+                    # Fallback to full load if fragmenting fails
+                    f.seek(0)
+                    logs = json.load(f)
+        else:
+            with open(audit_path, "r") as f:
+                logs = json.load(f)
 
         if not logs:
             return state
@@ -268,18 +373,10 @@ async def engine_init():
     return JSONResponse({"success": True, "message": "KingIn API server ready"})
 
 
-@app.post("/engine/auth")
-async def engine_auth(request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    token = f"api_token_{int(time.time())}"
-    return JSONResponse({"success": True, "token": token})
-
-
 @app.get("/engine/state")
-async def engine_state():
+async def engine_state(request: Request):
+    if not _check_token(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
     state = _build_engine_state()
     return JSONResponse(state)
 
@@ -287,7 +384,7 @@ async def engine_state():
 @app.post("/engine/start")
 async def engine_start(request: Request):
     if not _check_token(request):
-        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=403)
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
     global _engine_process, _engine_start_time
 
     if _is_engine_running():

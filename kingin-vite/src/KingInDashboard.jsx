@@ -370,6 +370,8 @@ const useAppState = () => {
   };
 };
 
+import api from './api';
+
 const useEngineState = () => {
   const [engineState, setEngineState] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -379,9 +381,8 @@ const useEngineState = () => {
 
     const fetchState = async () => {
       try {
-        const res = await fetch('/api/engine/state');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const state = await res.json();
+        const res = await api.get('/engine/state');
+        const state = res.data;
         if (!cancelled) {
           setEngineState(state);
           setConnected(true);
@@ -602,7 +603,16 @@ const SignalStatusBar = ({ engineState }) => {
       {sl > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>SL <span style={{ color: '#ff2d4e' }}>${sl.toFixed(2)}</span></span></>}
       {tp > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>TP <span style={{ color: '#00e87a' }}>${tp.toFixed(2)}</span></span></>}
       {score > 0 && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>SCORE <span style={{ color: '#ffaa00' }}>{score.toFixed(1)}</span></span></>}
+      {engineState.layer_results?.find(l => l.layer === 'MLFilterLayer') && (
+        <>
+          <span style={{ color: 'var(--kg-muted, #556)' }}>|</span>
+          <span style={{ color: '#aab' }}>ML CONF <span style={{ color: '#00e87a' }}>
+            {(engineState.layer_results.find(l => l.layer === 'MLFilterLayer').result.score * 100).toFixed(0)}%
+          </span></span>
+        </>
+      )}
       {kz !== 'N/A' && <><span style={{ color: 'var(--kg-muted, #556)' }}>|</span><span style={{ color: '#aab' }}>KZ <span style={{ color: '#dde' }}>{kz}</span></span></>}
+
     </div>
   );
 };
@@ -1323,187 +1333,235 @@ const SystemLogsPanel = ({ logsData }) => {
 };
 
 const SettingsPanel = () => {
-  const [settings, setSettings] = useState({
-    wsUrl: 'ws://localhost:8080/stream',
-    restUrl: 'http://localhost:8000/api',
-    refreshRate: 1000,
-    decimals: 5,
-    dateFormat: 'MM/DD/YYYY',
-    timezone: 'UTC',
-    notifications: {
-      errors: true,
-      riskWarnings: true,
-      positionClosed: true,
-      offline: true,
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        setSettings(res.data);
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage('');
+    try {
+      const res = await api.post('/settings', settings);
+      if (res.data.success) {
+        setMessage('✅ Settings saved successfully');
+      } else {
+        setMessage('❌ ' + (res.data.error || 'Save failed'));
+      }
+    } catch (err) {
+      setMessage('❌ Connection error');
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(''), 3000);
     }
-  });
-  
-  const [expandedSection, setExpandedSection] = useState('connection');
-  
-  const toggleSection = (section) => {
-    setExpandedSection(expandedSection === section ? '' : section);
   };
-  
+
+  if (loading) return <div className="panel-content">Loading settings...</div>;
+  if (!settings) return <div className="panel-content">Error loading settings.</div>;
+
   return (
     <div className="panel-content">
       <div className="panel-header">
         <div>
-          <h1 className="panel-title">Settings</h1>
-          <p className="panel-subtitle">Dashboard configuration</p>
+          <h1 className="panel-title">System Settings</h1>
+          <p className="panel-subtitle">Configure broker connection and trading parameters</p>
         </div>
+        <button 
+          className="btn btn-primary" 
+          onClick={handleSave}
+          disabled={saving}
+          style={{ background: 'var(--kg-gold)', color: '#000', fontWeight: 700 }}
+        >
+          {saving ? 'SAVING...' : 'SAVE CONFIGURATION'}
+        </button>
       </div>
-      
-      <div className="settings-section">
-        <div className="settings-section-header" onClick={() => toggleSection('connection')}>
-          <span className="settings-section-title">Connection</span>
-          <span>{expandedSection === 'connection' ? '−' : '+'}</span>
+
+      {message && (
+        <div style={{ 
+          padding: '10px', marginBottom: '20px', borderRadius: '4px',
+          background: message.startsWith('✅') ? 'rgba(0, 232, 122, 0.1)' : 'rgba(255, 45, 78, 0.1)',
+          color: message.startsWith('✅') ? '#00e87a' : '#ff2d4e',
+          border: '1px solid currentColor',
+          fontSize: '12px'
+        }}>
+          {message}
         </div>
-        {expandedSection === 'connection' && (
-          <div className="settings-section-content">
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">WebSocket URL</div>
-                <div className="setting-description">Trading data stream endpoint</div>
+      )}
+
+      <div className="two-col">
+        <div className="two-col-main">
+          {/* Broker Section */}
+          <div className="data-table-container" style={{ marginBottom: '24px', padding: '20px' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--kg-gold)' }}>Broker Connection (MT5)</h3>
+            
+            <div style={formStyles.row}>
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>MT5 Account</label>
+                <input 
+                  className="input"
+                  type="text" 
+                  value={settings.pipeline?.data_provider?.config?.login || ''} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    pipeline: {
+                      ...settings.pipeline,
+                      data_provider: {
+                        ...settings.pipeline.data_provider,
+                        config: { ...settings.pipeline.data_provider.config, login: e.target.value }
+                      }
+                    }
+                  })}
+                />
               </div>
-              <div className="setting-control">
-                <input type="text" className="input" value={settings.wsUrl} onChange={() => {}} style={{ width: 250 }} />
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>MT5 Server</label>
+                <input 
+                  className="input"
+                  type="text" 
+                  value={settings.pipeline?.data_provider?.config?.server || ''} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    pipeline: {
+                      ...settings.pipeline,
+                      data_provider: {
+                        ...settings.pipeline.data_provider,
+                        config: { ...settings.pipeline.data_provider.config, server: e.target.value }
+                      }
+                    }
+                  })}
+                />
               </div>
             </div>
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">REST API Base URL</div>
-                <div className="setting-description">HTTP API endpoint</div>
-              </div>
-              <div className="setting-control">
-                <input type="text" className="input" value={settings.restUrl} onChange={() => {}} style={{ width: 250 }} />
-              </div>
-            </div>
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">Reconnect Interval</div>
-              </div>
-              <div className="setting-control">
-                <select className="select" defaultValue="5000" style={{ width: 120 }}>
-                  <option value="1000">1s</option>
-                  <option value="3000">3s</option>
-                  <option value="5000">5s</option>
-                  <option value="10000">10s</option>
-                </select>
+            
+            <div style={formStyles.row}>
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>MT5 Password</label>
+                <input 
+                  className="input"
+                  type="password" 
+                  value={settings.pipeline?.data_provider?.config?.password || ''} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    pipeline: {
+                      ...settings.pipeline,
+                      data_provider: {
+                        ...settings.pipeline.data_provider,
+                        config: { ...settings.pipeline.data_provider.config, password: e.target.value }
+                      }
+                    }
+                  })}
+                />
               </div>
             </div>
           </div>
-        )}
-      </div>
-      
-      <div className="settings-section">
-        <div className="settings-section-header" onClick={() => toggleSection('display')}>
-          <span className="settings-section-title">Display</span>
-          <span>{expandedSection === 'display' ? '−' : '+'}</span>
-        </div>
-        {expandedSection === 'display' && (
-          <div className="settings-section-content">
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">Refresh Rate</div>
+
+          {/* Trading Parameters */}
+          <div className="data-table-container" style={{ padding: '20px' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--kg-gold)' }}>Strategy & Execution</h3>
+            
+            <div style={formStyles.row}>
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>Trading Symbol</label>
+                <input 
+                  className="input"
+                  type="text" 
+                  value={settings.trading?.symbol || ''} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    trading: { ...settings.trading, symbol: e.target.value }
+                  })}
+                />
               </div>
-              <div className="setting-control">
-                <select className="select" value={settings.refreshRate} onChange={(e) => setSettings({ ...settings, refreshRate: Number(e.target.value) })} style={{ width: 120 }}>
-                  <option value="500">500ms</option>
-                  <option value="1000">1s</option>
-                  <option value="2000">2s</option>
-                  <option value="5000">5s</option>
-                </select>
-              </div>
-            </div>
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">Price Decimal Places</div>
-              </div>
-              <div className="setting-control">
-                <select className="select" value={settings.decimals} onChange={(e) => setSettings({ ...settings, decimals: Number(e.target.value) })} style={{ width: 120 }}>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                  <option value="6">6</option>
-                </select>
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>Lot Size</label>
+                <input 
+                  className="input"
+                  type="number" 
+                  step="0.01"
+                  value={settings.trading?.lot_size || 0} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    trading: { ...settings.trading, lot_size: parseFloat(e.target.value) }
+                  })}
+                />
               </div>
             </div>
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">Date Format</div>
+
+            <div style={formStyles.row}>
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>Risk Percent per Trade</label>
+                <input 
+                  className="input"
+                  type="number" 
+                  step="0.1"
+                  value={settings.trading?.risk_percent || 0} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    trading: { ...settings.trading, risk_percent: parseFloat(e.target.value) }
+                  })}
+                />
               </div>
-              <div className="setting-control">
-                <select className="select" value={settings.dateFormat} onChange={() => {}} style={{ width: 150 }}>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
-            </div>
-            <div className="setting-row">
-              <div>
-                <div className="setting-label">Timezone</div>
-              </div>
-              <div className="setting-control">
-                <select className="select" value={settings.timezone} onChange={() => {}} style={{ width: 150 }}>
-                  <option value="UTC">UTC</option>
-                  <option value="LOCAL">Local</option>
-                  <option value="EST">EST</option>
-                  <option value="GMT">GMT</option>
-                </select>
+              <div style={formStyles.col}>
+                <label style={formStyles.label}>Min Confluence Score</label>
+                <input 
+                  className="input"
+                  type="number" 
+                  step="0.5"
+                  value={settings.confluence?.min_score || 0} 
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    confluence: { ...settings.confluence, min_score: parseFloat(e.target.value) }
+                  })}
+                />
               </div>
             </div>
           </div>
-        )}
-      </div>
-      
-      <div className="settings-section">
-        <div className="settings-section-header" onClick={() => toggleSection('notifications')}>
-          <span className="settings-section-title">Notifications</span>
-          <span>{expandedSection === 'notifications' ? '−' : '+'}</span>
         </div>
-        {expandedSection === 'notifications' && (
-          <div className="settings-section-content">
-            {Object.entries(settings.notifications).map(([key, value]) => (
-              <div className="setting-row" key={key}>
-                <div>
-                  <div className="setting-label">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                </div>
-                <div className="setting-control">
-                  <div className={`toggle ${value ? 'active' : ''}`} onClick={() => setSettings({ 
-                    ...settings, 
-                    notifications: { ...settings.notifications, [key]: !value } 
-                  })} />
-                </div>
+
+        <div className="two-col-side">
+          <div className="data-table-container" style={{ padding: '20px' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--kg-gold)' }}>Active Filters</h3>
+            {Object.keys(settings.layers || {}).map(layer => (
+              <div key={layer} style={{ 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 0', borderBottom: '1px solid #1a1a1a'
+              }}>
+                <span style={{ fontSize: '11px' }}>{layer.replace('Layer', '')}</span>
+                <div 
+                  className={`toggle ${settings.layers[layer] ? 'active' : ''}`}
+                  onClick={() => setSettings({
+                    ...settings,
+                    layers: { ...settings.layers, [layer]: !settings.layers[layer] }
+                  })}
+                />
               </div>
             ))}
           </div>
-        )}
-      </div>
-      
-      <div className="settings-section">
-        <div className="settings-section-header" onClick={() => toggleSection('about')}>
-          <span className="settings-section-title">About</span>
-          <span>{expandedSection === 'about' ? '−' : '+'}</span>
         </div>
-        {expandedSection === 'about' && (
-          <div className="settings-section-content">
-            <div className="setting-row">
-              <div className="setting-label">App Version</div>
-              <div className="setting-control">1.0.0</div>
-            </div>
-            <div className="setting-row">
-              <div className="setting-label">Backend Version</div>
-              <div className="setting-control">v2.4.1</div>
-            </div>
-            <div className="setting-row">
-              <div className="setting-label">Last Sync</div>
-              <div className="setting-control">just now</div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
+};
+
+const formStyles = {
+  row: { display: 'flex', gap: '20px', marginBottom: '15px' },
+  col: { flex: 1 },
+  label: { display: 'block', fontSize: '10px', color: '#556', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }
 };
 
 // =============================================================================

@@ -64,111 +64,28 @@ const Login = ({ onLogin }) => {
   const handleLogin = async (e) => {
     e.preventDefault();
     
-    if (locked) {
-      setError(`🔒 Too many attempts. Please wait ${countdown} seconds.`);
-      return;
-    }
-
-    // Validation
-    if (!account || !account.trim()) { 
-      setError("❌ Account number is required."); 
-      return; 
-    }
-    if (!/^\d+$/.test(account.trim())) {
-      setError("❌ Account must be numeric (e.g., 298686191).");
-      return;
-    }
     if (!password) { 
       setError("❌ Password is required."); 
-      return; 
-    }
-    if (!server || !server.trim()) { 
-      setError("❌ Server name is required (e.g., Exness-MT5Trial9)."); 
       return; 
     }
 
     setLoading(true);
     setError('');
-    setMt5Status('🔗 Connecting to MT5 Terminal...');
 
     try {
-      let result;
-      try {
-        console.log(`[Login] Invoking auth_mt5 with account=${account}, server=${server}, savePwd=${savePassword}`);
-        const resStr = await invoke('auth_mt5', {
-          account: account.toString(),
-          password: password,
-          server: server,
-          savePwd: savePassword
-        });
-        console.log(`[Login] auth_mt5 response: ${resStr}`);
-        try {
-          result = JSON.parse(resStr);
-        } catch (parseErr) {
-          console.error(`[Login] JSON parse error:`, parseErr, `Raw response: ${resStr}`);
-          result = { error: resStr || `Invalid response from auth backend: ${parseErr}` };
-        }
-      } catch (invokeErr) {
-        // Tauri backend call failed
-        console.error("[Login] Tauri invoke error:", invokeErr);
-        console.error("[Login] Error type:", invokeErr?.constructor?.name);
-        console.error("[Login] Error message:", invokeErr?.message);
-        console.error("[Login] Error details:", JSON.stringify(invokeErr, null, 2));
-        result = { error: invokeErr?.message || invokeErr?.toString?.() || "Tauri backend not reachable. Run via Tauri wrapper." };
-      }
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      
+      const result = await response.json();
 
       if (result.success) {
-        // Save to browser local storage for convenience
-        localStorage.setItem('its_creds', JSON.stringify({
-          account, server, savePassword
-        }));
-        
-        // Generate a local session token 
-        const sessionToken = Date.now().toString() + '_' + account;
-        sessionStorage.setItem('session_token', sessionToken);
-        sessionStorage.setItem('session_time', Date.now().toString());
-        
-        // Start the trading engine backend
-        try {
-          setMt5Status('⚙️  Initializing trading engine...');
-          await invoke('start_engine');
-          setMt5Status('✅ Engine ready - Launching dashboard...');
-          // Small delay to ensure engine is ready
-          setTimeout(() => onLogin(sessionToken), 800);
-        } catch (engineErr) {
-          console.warn('Engine start warning:', engineErr);
-          // Don't fail login if engine start fails - user can start manually
-          setMt5Status('⚠️  Engine offline - Dashboard available (manual start required)');
-          setTimeout(() => onLogin(sessionToken), 500);
-        }
+        localStorage.setItem('kingin_jwt', result.token);
+        onLogin(result.token);
       } else {
-        const newAttempts = attempts + 1;
-        setAttempts(newAttempts);
-        
-        const errStr = result.error || "Invalid credentials.";
-        let displayError = errStr;
-        let icon = "❌";
-        
-        // Enhance error message with diagnostic hints
-        if (errStr.includes("MT5 Terminal") || errStr.includes("initialize")) {
-          displayError = "MT5 Terminal not responding. Ensure MetaTrader 5 is open and 'Auto-trading' is enabled.";
-          icon = "📴";
-        } else if (errStr.includes("authorization") || errStr.includes("Authorization")) {
-          displayError = "Invalid credentials. Check: 1) Account ID, 2) Password, 3) Server name (case-sensitive).";
-          icon = "🔐";
-        } else if (errStr.includes("Connection") || errStr.includes("python")) {
-          displayError = "Bridge error: Python/MT5 library not found. Check system setup.";
-          icon = "⚠️ ";
-        }
-        
-        if (newAttempts >= 5) {
-          setLocked(true);
-          setCountdown(60);
-          setError(`${icon} Too many failed attempts. Account locked for 60 seconds.`);
-          setMt5Status('🔒 Locked - too many attempts');
-        } else {
-          setError(`${icon} ${displayError}\n(${5 - newAttempts} attempt${5 - newAttempts !== 1 ? 's' : ''} remaining)`);
-        }
+        setError(result.error || "Invalid password.");
       }
     } catch (err) {
       setError('Login error: ' + err.message);
@@ -176,6 +93,7 @@ const Login = ({ onLogin }) => {
       setLoading(false);
     }
   };
+
 
   return (
     <div style={styles.container}>
@@ -193,53 +111,14 @@ const Login = ({ onLogin }) => {
         
         <form onSubmit={handleLogin} style={styles.form}>
           <div>
-            <div style={styles.label}>MT5 Account</div>
-            <input
-              type="text"
-              placeholder="e.g. 298686191"
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-              style={styles.input}
-              disabled={locked}
-            />
-          </div>
-          
-          <div>
-            <div style={styles.label}>Password</div>
+            <div style={styles.label}>Access Password</div>
             <input
               type="password"
               placeholder="●●●●●●●●"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={styles.input}
-              disabled={locked}
             />
-          </div>
-
-          <div>
-            <div style={styles.label}>Server</div>
-            <input
-              type="text"
-              placeholder="e.g. Exness-MT5Trial9"
-              value={server}
-              onChange={(e) => setServer(e.target.value)}
-              style={styles.input}
-              disabled={locked}
-            />
-          </div>
-
-          <div style={styles.checkboxContainer}>
-            <input 
-              type="checkbox" 
-              id="savePwd"
-              checked={savePassword}
-              onChange={(e) => setSavePassword(e.target.checked)}
-              disabled={locked}
-              style={{cursor: 'pointer'}}
-            />
-            <label htmlFor="savePwd" style={styles.checkboxLabel}>
-              Save password (encrypted locally)
-            </label>
           </div>
           
           {error && <p style={styles.error}>{error}</p>}
@@ -247,10 +126,11 @@ const Login = ({ onLogin }) => {
           <button 
             type="submit" 
             style={styles.button}
-            disabled={loading || locked}
+            disabled={loading}
           >
-            {loading ? '⏳ CONNECTING...' : '🚀 CONNECT & LAUNCH'}
+            {loading ? '⏳ AUTHENTICATING...' : '🚀 SECURE LOGIN'}
           </button>
+
           
           <div style={styles.helpText}>
             <strong>Need help?</strong> Ensure MetaTrader 5 is running with auto-trading enabled

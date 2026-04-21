@@ -10,28 +10,6 @@ from .base_provider import BaseDataProvider
 
 logger = logging.getLogger("MT5Provider")
 
-# Common symbol mappings for multi-broker compatibility (Gold variants)
-SYMBOL_ALTERNATIVES = {
-    "XAUUSD": [
-        # Try exact names first
-        "XAUUSD", "XAUUSD.i", "XAUUSD.x", "XAUUSDm",
-        "GOLD", "GOLD.i", "GOLD.x", "GOLDm",
-        # Try with various suffixes
-        "XAUUSDmicro", "GLD", "XAU", "XAUUSD_ECN",
-        "XAUUSDpro", "XAUUSDv", "XAUUSD#", "XAUUSD_",
-        "Gold", "XAU_USD", "XAU/USD", "GOLD_PRO",
-        "Au", "AUUSD", "XAUUSD.t",
-        # Exness specific
-        "XAUUSD-E", "XAUUSDm.E", "GOLD.E", "GOLDm",
-        # Try without suffix
-        "XAUUSDm.", "XAU.", "GOLD.",
-        # Add common broker variations
-        "XAUUSD_i", "XAUUSD_x", "GOLD_i", "GOLD_x",
-        # More alternatives
-        "GOLD#", "XAU#", "XAUUSDmicro.", "GOLDmicro"
-    ]
-}
-
 
 class MT5DataProvider(BaseDataProvider):
     """
@@ -53,6 +31,18 @@ class MT5DataProvider(BaseDataProvider):
         self.password = config.get("password")
         self.server = config.get("server")
         
+        # Load symbol alternatives from JSON
+        self.symbol_alternatives = {}
+        try:
+            map_path = Path(__file__).parent / "symbol_map.json"
+            if map_path.exists():
+                with open(map_path, "r") as f:
+                    self.symbol_alternatives = json.load(f)
+            else:
+                logger.warning(f"symbol_map.json not found at {map_path}. Using default empty map.")
+        except Exception as e:
+            logger.error(f"Failed to load symbol_map.json: {e}")
+
         # ── ITS Runtime Credentials bridge ──────────────────────────────
         if not self.password:
             try:
@@ -88,13 +78,14 @@ class MT5DataProvider(BaseDataProvider):
             logger.info(f"[SYMBOL] Using exact match: {symbol}")
             return symbol
         
-        # Try alternatives from SYMBOL_ALTERNATIVES
-        alternatives = SYMBOL_ALTERNATIVES.get(symbol, [symbol])
+        # Try alternatives from loaded map
+        alternatives = self.symbol_alternatives.get(symbol, [symbol])
         for alt in alternatives:
             if mt5.symbol_info(alt):
                 logger.info(f"[SYMBOL] Auto-mapped {symbol} -> {alt}")
                 self._symbol_map[symbol] = alt
                 return alt
+
         
         # Try wildcard search in available symbols
         all_symbols = mt5.symbols_get()

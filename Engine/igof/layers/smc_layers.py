@@ -24,8 +24,10 @@ class LayerFactory:
         "Displacement": DisplacementLayer,
         "MicroMSS": MicroMSSLayer,
         "KillzoneFilter": KillzoneFilterLayer,
-        "NewsEventLayer": NewsEventLayer
+        "NewsEventLayer": NewsEventLayer,
+        "MLFilter": "Engine.igof.layers.ml_layer.MLFilterLayer" # Use string for late binding or import directly
     }
+
 
     @staticmethod
     def create_layers(layer_names: List[str], thresholds: Dict[str, float] = None) -> List[Any]:

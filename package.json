@@ -1,26 +1,39 @@
 {
-  "name": "institutional-trading-system",
+  "name": "kingin-institutional-trading",
   "version": "1.0.0",
   "description": "Institutional Trading System Native Desktop App",
-  "type": "module",
+  "main": "electron/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:api": "python kingin_api.py",
+    "dev:vite": "cd kingin-vite && npm run dev",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "cd kingin-vite && npm run build",
+    "electron:build": "npm run build && electron-builder",
+    "test": "pytest Engine/tests"
   },
   "devDependencies": {
-    "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/cli": "^2.0.0",
-    "@vitejs/plugin-react": "^6.0.1",
-    "esbuild": "^0.25.12",
-    "sharp": "^0.33.5",
-    "vite": "^8.0.8"
+    "concurrently": "^8.2.2",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.kingin.trading",
+    "productName": "KingIn Trading System",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "electron/**/*",
+      "kingin-vite/dist/**/*"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "installerIcon": "its_icon.ico",
+      "uninstallerIcon": "its_icon.ico"
+    }
   }
 }

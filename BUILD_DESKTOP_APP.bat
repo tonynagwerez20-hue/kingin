@@ -1,62 +1,43 @@
 @echo off
 setlocal
+title KingIn Trading System - Build Desktop App
 
-set "PROJECT_DIR=%~dp0"
-set "FRONTEND_DIR=%PROJECT_DIR%kingin-vite"
-
-cd /d "%PROJECT_DIR%"
-
-echo Building KingIn desktop dashboard assets...
-echo.
-
-where node >nul 2>nul
-if %errorlevel% neq 0 (
-    echo ERROR: Node.js not found in PATH. Install Node.js 18 or newer.
-    pause
-    exit /b 1
-)
-
-where npm >nul 2>nul
-if %errorlevel% neq 0 (
-    echo ERROR: npm not found in PATH. Reinstall Node.js with npm enabled.
-    pause
-    exit /b 1
-)
-
-if not exist "%FRONTEND_DIR%\package.json" (
-    echo ERROR: React dashboard package not found at %FRONTEND_DIR%.
-    pause
-    exit /b 1
-)
-
-cd /d "%FRONTEND_DIR%"
-
-if exist package-lock.json (
-    echo Installing JavaScript dependencies with npm ci...
-    call npm ci
-) else (
-    echo Installing JavaScript dependencies with npm install...
-    call npm install
-)
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to install JavaScript dependencies.
-    pause
-    exit /b 1
-)
+echo ============================================================
+echo [1/4] Installing Root Dependencies...
+echo ============================================================
+call npm install --no-fund
 
 echo.
-echo Building production dashboard...
+echo ============================================================
+echo [2/4] Installing Dashboard Dependencies...
+echo ============================================================
+cd kingin-vite
+call npm install --no-fund
+cd ..
+
+echo.
+echo ============================================================
+echo [3/4] Building Dashboard (Vite)...
+echo ============================================================
 call npm run build
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to build the React dashboard.
-    pause
-    exit /b 1
-)
 
 echo.
-echo Build complete.
-echo Dashboard output: %FRONTEND_DIR%\dist
-echo Use LAUNCH_DESKTOP_APP.bat for local desktop/browser operation.
+echo ============================================================
+echo [4/4] Building Native Installer (Electron-Builder)...
+echo ============================================================
+echo This may take a few minutes as it compiles the native wrapper...
+call npm run electron:build
 
-endlocal
+echo.
+echo ============================================================
+echo BUILD COMPLETE!
+echo ============================================================
+echo Your professional installer is located in: 
+echo dist_electron\KingIn Trading System Setup 1.0.0.exe
+echo.
+echo Launch the installer to:
+echo 1. Install KingIn to your Program Files
+echo 2. Add an icon to your Desktop
+echo 3. Create a Start Menu shortcut
+echo.
 pause

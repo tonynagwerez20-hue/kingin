@@ -4,20 +4,37 @@
 import { useState, useEffect } from 'react';
 import Login from './Login.jsx';
 import KingInDashboard from './KingInDashboard.jsx';
+import SetupWizard from './SetupWizard.jsx';
+import api from './api.js';
 import './kingin.css';
 
 const App = () => {
   const [sessionToken, setSessionToken] = useState(null);
+  const [isConfigured, setIsConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  // Check session on mount
+  // Check session and system status on mount
   useEffect(() => {
-    // Auto-login for demo purposes
-    const demoToken = 'demo_session_' + Date.now();
-    sessionStorage.setItem('session_token', demoToken);
-    sessionStorage.setItem('session_time', Date.now().toString());
-    setSessionToken(demoToken);
-    setLoading(false);
+    const checkStatus = async () => {
+      try {
+        // 1. Check if configured
+        const statusRes = await fetch('/api/system/status');
+        const status = await statusRes.json();
+        setIsConfigured(status.configured);
+
+        // 2. Check if logged in
+        const token = localStorage.getItem('kingin_jwt');
+        if (token) {
+          setSessionToken(token);
+        }
+      } catch (err) {
+        console.error("Initialization error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkStatus();
   }, []);
 
   const handleLogin = (token) => {
@@ -25,18 +42,26 @@ const App = () => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('session_token');
-    sessionStorage.removeItem('session_time');
+    localStorage.removeItem('kingin_jwt');
     setSessionToken(null);
+  };
+
+  const handleSetupComplete = () => {
+    setIsConfigured(true);
   };
 
   // Loading state
   if (loading) {
     return (
       <div style={styles.loading}>
-        <div>Loading...</div>
+        <div>INITIALIZING KINGIN...</div>
       </div>
     );
+  }
+
+  // First-run experience
+  if (!isConfigured) {
+    return <SetupWizard onComplete={handleSetupComplete} />;
   }
 
   // Render based on authentication state

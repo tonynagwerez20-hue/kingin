@@ -1,10 +1,10 @@
 @echo off
-TITLE Institutional Trading System - PORTABLE SETUP
+TITLE KingIn Institutional Trading System - SETUP
 SET "PROJECT_DIR=%~dp0"
 cd /d "%PROJECT_DIR%"
 
 echo ==========================================================
-echo    HedgeEA PROFESSIONAL SETUP ^& INSTALLATION
+echo    KingIn PROFESSIONAL SETUP ^& INSTALLATION
 echo ==========================================================
 echo.
 
@@ -12,69 +12,66 @@ echo.
 python --version >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Python is not installed or not in PATH.
-    echo Please install Python 3.10 and tick "Add to PATH".
+    echo Please install Python 3.10+ and tick "Add to PATH".
     pause
     exit /b
 )
 echo [OK] Python detected.
-   
-   :: 2. Install/Update Core Dependencies
-   echo [INFO] Installing required libraries into Global Python...
-   python -m pip install --upgrade pip
-   python -m pip install -r requirements.txt
-   
-   if %ERRORLEVEL% neq 0 (
-       echo [ERROR] Dependency installation failed. Check internet or Python permissions.
-       pause
-       exit /b
-   )
-echo [OK] Libraries installed successfully.
 
-:: 3. Setup Folders (including news cache directory)
+:: 2. Setup Virtual Environment
+if not exist ".venv" (
+    echo [INFO] Creating Virtual Environment...
+    python -m venv .venv
+)
+echo [OK] Virtual Environment ready.
+
+:: 3. Install Python Dependencies
+echo [INFO] Installing Python libraries...
+call .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Python dependency installation failed.
+    pause
+    exit /b
+)
+echo [OK] Python libraries installed.
+
+:: 4. Initialize .env if missing
+if not exist ".env" (
+    echo [INFO] Initializing .env file...
+    echo KINGIN_USER_PASSWORD=kingin123 > .env
+    echo KINGIN_JWT_SECRET=%RANDOM%%RANDOM% >> .env
+    echo [OK] .env initialized with default password 'kingin123'.
+)
+
+:: 5. Create system directories
 echo [INFO] Creating system directories...
 if not exist "storage\logs"        mkdir "storage\logs"
 if not exist "storage\news_cache"  mkdir "storage\news_cache"
-if not exist "storage\risk_state"  mkdir "storage\risk_state"
 if not exist "data"                mkdir "data"
+if not exist "models"              mkdir "models"
 echo [OK] Folders ready.
 
-:: 4. Optional: Build React Dashboard (if Node.js is present)
-   echo.
-   echo [INFO] Checking for Node.js (optional - for React dashboard development)...
-   node --version >nul 2>&1
-   if %ERRORLEVEL% equ 0 (
-       echo [OK] Node.js detected.
-       if exist "kingin-vite\package.json" (
-           echo [INFO] Installing KingIn React dashboard dependencies...
-           cd kingin-vite
-           if exist package-lock.json (
-               call npm ci --silent
-           ) else (
-               call npm install --silent
-           )
-           echo [INFO] Building React dashboard...
-           call npm run build --silent
-           cd ..
-           echo [OK] React dashboard built at kingin-vite\dist\
-       ) else (
-           echo [INFO] kingin-vite\package.json not found. Skipping React build.
-       )
-   ) else (
-       echo [INFO] Node.js not found. React dashboard development features skipped.
-       echo        To enable React dev mode: install Node.js 18+ and re-run SETUP_PROJECT.bat
-   )
+:: 6. Check for Node.js
+node --version >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo [OK] Node.js detected.
+    echo [INFO] Installing Node dependencies...
+    call npm install
+    cd kingin-vite
+    call npm install
+    cd ..
+) else (
+    echo [WARN] Node.js not found. Cannot build desktop app dashboard.
+)
 
-:: 5. Final summary
 echo.
 echo ==========================================================
 echo    SETUP COMPLETE
 echo ==========================================================
-echo 1. Open MetaTrader 5 and log in.
-echo 2. Run START_ALL.bat to launch the system.
-echo 3. Local React dashboard: run LAUNCH_DESKTOP_APP.bat, then open http://localhost:5000
-echo.
-echo NOTE: Global Python 3.10 is the recommended stable path.
-echo       Avoid virtual environments if you experience crashes.
+echo 1. Set your custom password in .env file.
+echo 2. Map your symbols in Engine/data_feed/symbol_map.json.
+echo 3. Run BUILD_DESKTOP_APP.bat to generate the installer.
 echo ==========================================================
 pause
- 

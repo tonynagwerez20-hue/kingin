@@ -21,8 +21,22 @@ import sys
 import threading
 import time
 from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("ZMQBridge")
+
+class SignalMessage(BaseModel):
+    action: str
+    symbol: str
+    price: float
+    sl: float
+    tp: float = 0.0
+    lots: float
+    execution_type: str = "MARKET"
+    confluence_score: float = 0.0
+    bias: str = "NEUTRAL"
+    timestamp: str = Field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
+
 
 
 # ── Auto-install pyzmq if missing ────────────────────────────────────────────
@@ -158,32 +172,28 @@ class ZMQBridge:
             logger.error("[ZMQBridge] send_signal — not ready. Check pyzmq.")
             return False
 
-        required = ("action", "symbol", "price", "sl", "lots")
-        missing  = [k for k in required if not signal.get(k)]
-        if missing:
-            logger.error(
-                f"[ZMQBridge] Missing required fields {missing} — signal not sent."
-            )
-            return False
-
         try:
-            payload = json.dumps(signal, default=str)
+            # Validate signal with Pydantic
+            validated_signal = SignalMessage(**signal)
+            signal_dict = validated_signal.model_dump()
+            
+            payload = json.dumps(signal_dict, default=str)
             message = f"{self.topic} {payload}"
 
             with self._lock:
                 self._pub.send_string(message)
 
             logger.info("══════════════ SIGNAL → HEDGEEA ══════════════")
-            logger.info(f"  action           = {signal.get('action')}")
-            logger.info(f"  symbol           = {signal.get('symbol')}")
-            logger.info(f"  price            = {signal.get('price')}")
-            logger.info(f"  sl               = {signal.get('sl')}")
-            logger.info(f"  tp               = {signal.get('tp', 0.0)}")
-            logger.info(f"  lots             = {signal.get('lots')}")
-            logger.info(f"  execution_type   = {signal.get('execution_type', 'MARKET')}")
-            logger.info(f"  confluence_score = {signal.get('confluence_score', 0.0)}")
-            logger.info(f"  bias             = {signal.get('bias', 'NEUTRAL')}")
-            logger.info(f"  timestamp        = {signal.get('timestamp')}")
+            logger.info(f"  action           = {signal_dict.get('action')}")
+            logger.info(f"  symbol           = {signal_dict.get('symbol')}")
+            logger.info(f"  price            = {signal_dict.get('price')}")
+            logger.info(f"  sl               = {signal_dict.get('sl')}")
+            logger.info(f"  tp               = {signal_dict.get('tp')}")
+            logger.info(f"  lots             = {signal_dict.get('lots')}")
+            logger.info(f"  execution_type   = {signal_dict.get('execution_type')}")
+            logger.info(f"  confluence_score = {signal_dict.get('confluence_score')}")
+            logger.info(f"  bias             = {signal_dict.get('bias')}")
+            logger.info(f"  timestamp        = {signal_dict.get('timestamp')}")
             logger.info("══════════════════════════════════════════════")
             return True
 
@@ -192,6 +202,7 @@ class ZMQBridge:
             return False
 
     def check_connection(self) -> bool:
+
         """
         Ping HedgeEA REP socket. Returns True if PONG received.
         Uses a fresh REQ socket each call (avoids state-machine deadlocks).
