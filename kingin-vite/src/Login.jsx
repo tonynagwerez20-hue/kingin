@@ -1,141 +1,64 @@
-// Login.jsx - Authentication page
-// Secured MT5 authentication via Tauri bridge
-
-import { useState, useEffect } from 'react';
-import { invoke } from './tauri-stub.js';
-import BrandLogo from './BrandLogo.jsx';
+import { useState } from 'react';
+import api from './api';
 
 const Login = ({ onLogin }) => {
-  const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
-  const [server, setServer] = useState('');
-  const [savePassword, setSavePassword] = useState(false);
-  
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [locked, setLocked] = useState(false);
-  const [attempts, setAttempts] = useState(0);
-  const [countdown, setCountdown] = useState(0);
-  const [mt5Status, setMt5Status] = useState('Initializing MT5 backend...');
-  const [mt5Ready, setMt5Ready] = useState(false);
-
-  // Initialize MT5 backend in background on mount
-  useEffect(() => {
-    const initMt5 = async () => {
-      try {
-        setMt5Status('Initializing MT5 backend...');
-        // Quick initialization check via Tauri
-        await invoke('init_mt5_backend');
-        setMt5Status('MT5 bridge initialized. Ready to connect.');
-        setMt5Ready(true);
-      } catch (err) {
-        console.error('Init error:', err);
-        setMt5Status('MT5 bridge ready (Compatibility mode active)');
-        setMt5Ready(true);
-      }
-    };
-
-    // Start background initialization
-    initMt5();
-
-    // Check for stored credentials
-    const storedStr = localStorage.getItem('its_creds');
-    if (storedStr) {
-      try {
-        const stored = JSON.parse(storedStr);
-        if (stored.account) setAccount(stored.account);
-        if (stored.server) setServer(stored.server);
-        if (stored.savePassword) setSavePassword(true);
-      } catch (e) {}
-    }
-  }, []);
-
-  // Countdown timer
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (countdown === 0 && locked) {
-      setLocked(false);
-      setAttempts(0);
-    }
-  }, [countdown, locked]);
+  const [error, setError] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    
-    if (!password) { 
-      setError("❌ Password is required."); 
-      return; 
+    if (!password) {
+      setError("❌ Password required");
+      return;
     }
 
     setLoading(true);
     setError('');
-
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      });
-      
-      const result = await response.json();
-
-      if (result.success) {
-        localStorage.setItem('kingin_jwt', result.token);
-        onLogin(result.token);
+      const res = await api.post('/login', { password });
+      if (res.data.success) {
+        localStorage.setItem('kingin_jwt', res.data.token);
+        onLogin(res.data.token);
       } else {
-        setError(result.error || "Invalid password.");
+        setError(res.data.error || "Invalid Access Token");
       }
     } catch (err) {
-      setError('Login error: ' + err.message);
+      setError('Connection failed. Is the backend running?');
     } finally {
       setLoading(false);
     }
   };
 
-
   return (
     <div style={styles.container}>
-      <div style={styles.loginBox}>
-        <BrandLogo size={120} />
-        
-        <h1 style={styles.title}>Institutional Trading System</h1>
-        <p style={styles.tagline}>Secure MT5 Backend Authentication</p>
-        
-        <div style={styles.statusBar}>
-          <span style={{...styles.statusText, color: mt5Ready ? '#00e87a' : '#ffaa00'}}>
-            {mt5Status}
-          </span>
-        </div>
+      <div style={styles.card}>
+        <div style={styles.logoCircle}>KI</div>
+        <h1 style={styles.title}>KINGIN</h1>
+        <p style={styles.subtitle}>INSTITUTIONAL CONTROL ROOM</p>
         
         <form onSubmit={handleLogin} style={styles.form}>
-          <div>
-            <div style={styles.label}>Access Password</div>
-            <input
-              type="password"
-              placeholder="●●●●●●●●"
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>ACCESS PASSWORD</label>
+            <input 
+              type="password" 
+              style={styles.input}
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
             />
           </div>
           
-          {error && <p style={styles.error}>{error}</p>}
+          {error && <div style={styles.error}>{error}</div>}
           
-          <button 
-            type="submit" 
-            style={styles.button}
-            disabled={loading}
-          >
-            {loading ? '⏳ AUTHENTICATING...' : '🚀 SECURE LOGIN'}
+          <button style={styles.button} disabled={loading}>
+            {loading ? 'AUTHENTICATING...' : 'SECURE ACCESS'}
           </button>
-
-          
-          <div style={styles.helpText}>
-            <strong>Need help?</strong> Ensure MetaTrader 5 is running with auto-trading enabled
-          </div>
         </form>
+        
+        <div style={styles.footer}>
+          System Hardened • JWT Secured • Local Bridge
+        </div>
       </div>
     </div>
   );
@@ -143,112 +66,37 @@ const Login = ({ onLogin }) => {
 
 const styles = {
   container: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '100vh',
-    background: '#000000',
-    fontFamily: "'JetBrains Mono', monospace",
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    height: '100vh', background: '#080B12', color: '#fff', fontFamily: 'Inter, sans-serif'
   },
-  loginBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '40px 80px',
-    background: '#0a0a0a',
-    borderRadius: '4px',
-    border: '1px solid #1a1a1a',
-    boxShadow: '0 4px 24px rgba(0, 200, 240, 0.1)',
+  card: {
+    width: '380px', padding: '50px 40px', background: '#0F1420', 
+    border: '1px solid #1C2333', borderRadius: '16px', textAlign: 'center',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
   },
-  title: {
-    margin: '16px 0 8px',
-    fontFamily: "'Syne', sans-serif",
-    fontWeight: '800',
-    fontSize: '22px',
-    color: '#00c8f0',
-    letterSpacing: '3px',
+  logoCircle: {
+    width: '60px', height: '60px', borderRadius: '50%', background: '#FFD700',
+    color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    margin: '0 auto 20px', fontWeight: 800, fontSize: '20px'
   },
-  tagline: {
-    margin: '0 0 24px',
-    fontSize: '11px',
-    color: '#445566',
-    letterSpacing: '1px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-    width: '260px',
-  },
-  label: {
-    fontSize: '11px',
-    color: '#445566',
-    marginBottom: '4px',
-  },
+  title: { fontSize: '28px', fontWeight: 800, letterSpacing: '4px', margin: 0, color: '#FFD700' },
+  subtitle: { fontSize: '10px', color: '#6B7280', letterSpacing: '2px', marginBottom: '40px', fontWeight: 600 },
+  form: { textAlign: 'left' },
+  inputGroup: { marginBottom: '24px' },
+  label: { display: 'block', fontSize: '10px', fontWeight: 700, color: '#9CA3AF', marginBottom: '8px', letterSpacing: '1px' },
   input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '10px 14px',
-    background: '#0a0a0a',
-    border: '1px solid #1a1a1a',
-    borderRadius: '4px',
-    color: '#e8f0f8',
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: '13px',
-    outline: 'none',
+    width: '100%', padding: '14px', background: '#080B12', border: '1px solid #1C2333',
+    borderRadius: '8px', color: '#fff', outline: 'none', transition: 'border-color 0.2s'
   },
-  checkboxContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginTop: '4px',
-  },
-  checkboxLabel: {
-    fontSize: '11px',
-    color: '#445566',
-    cursor: 'pointer',
-  },
-  error: {
-    color: '#ff2d4e',
-    fontSize: '11px',
-    textAlign: 'center',
-    margin: '4px 0',
-  },
+  error: { color: '#FF3B5C', fontSize: '12px', marginBottom: '20px', textAlign: 'center' },
   button: {
-    marginTop: '8px',
-    padding: '12px 24px',
-    background: 'transparent',
-    border: '2px solid #00e87a',
-    borderRadius: '24px',
-    color: '#00e87a',
-    fontFamily: "'Syne', sans-serif",
-    fontWeight: '700',
-    fontSize: '13px',
-    letterSpacing: '2px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    width: '100%', padding: '16px', background: '#FFD700', border: 'none',
+    borderRadius: '8px', color: '#000', fontWeight: 700, cursor: 'pointer',
+    letterSpacing: '1px', transition: 'transform 0.1s'
   },
-  statusBar: {
-    width: '100%',
-    padding: '8px 12px',
-    background: '#111111',
-    border: '1px solid #1a1a1a',
-    borderRadius: '4px',
-    marginBottom: '16px',
-    textAlign: 'center',
-  },
-  statusText: {
-    fontSize: '11px',
-    letterSpacing: '0.5px',
-  },
-  helpText: {
-    marginTop: '16px',
-    fontSize: '10px',
-    color: '#445566',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    maxWidth: '260px',
-  },
+  footer: { marginTop: '40px', fontSize: '10px', color: '#374151', textTransform: 'uppercase', letterSpacing: '1px' }
 };
+
+export default Login;
 
 export default Login;

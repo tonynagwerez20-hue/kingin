@@ -1727,16 +1727,48 @@ export default function KingInDashboard({ onLogout }) {
         onMouseEnter={() => appState.setSidebarExpanded(true)}
         onMouseLeave={() => appState.setSidebarExpanded(false)}
       >
-        {sidebarItems.map(item => (
-          <button
-            key={item.id}
-            className={`sidebar-item ${appState.activePanel === item.id ? 'active' : ''}`}
-            onClick={() => appState.setActivePanel(item.id)}
-          >
-            <span className="icon">{item.icon}</span>
-            <span className="label">{item.label}</span>
-          </button>
-        ))}
+        <div className="sidebar-nav">
+          {sidebarItems.map(item => (
+            <button
+              key={item.id}
+              className={`sidebar-item ${appState.activePanel === item.id ? 'active' : ''}`}
+              onClick={() => appState.setActivePanel(item.id)}
+            >
+              <span className="icon">{item.icon}</span>
+              <span className="label">{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Master Power Section in Sidebar */}
+        <div className="sidebar-footer">
+          <div className="master-power-container">
+            <div className="master-power-label">
+              {appState.sidebarExpanded ? 'SYSTEM MASTER POWER' : 'PWR'}
+            </div>
+            <div className="master-power-buttons">
+              <button 
+                className={`power-btn start ${engineState?.running ? 'active' : ''}`}
+                onClick={handleEngineStart}
+                disabled={engineLoading || engineState?.running}
+                title="Start Trading Engine"
+              >
+                ON
+              </button>
+              <button 
+                className={`power-btn stop ${!engineState?.running ? 'active' : ''}`}
+                onClick={handleEngineStop}
+                disabled={engineLoading || !engineState?.running}
+                title="Stop Trading Engine"
+              >
+                OFF
+              </button>
+            </div>
+            {engineMessage && appState.sidebarExpanded && (
+              <div className="engine-mini-msg">{engineMessage}</div>
+            )}
+          </div>
+        </div>
       </div>
       
       {/* Main Content */}

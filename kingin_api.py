@@ -347,6 +347,27 @@ def _build_engine_state() -> dict:
     audit_state = _read_audit_state()
     running = _is_engine_running()
 
+    # If engine is OFF, we suppress strategy-specific data to avoid confusion
+    if not running:
+        audit_state = {
+            "bias": "NEUTRAL",
+            "signal_action": "WAITING",
+            "entry_price": 0.0,
+            "stop_loss": 0.0,
+            "take_profit": 0.0,
+            "lot_size": 0.0,
+            "confluence_score": 0.0,
+            "killzone": "N/A",
+            "session_time": "N/A",
+            "rr_ratio": "0.00",
+            "current_price": 0.0,
+            "symbol": audit_state.get("symbol", "XAUUSD"),
+            "layers": [],
+            "last_trade": audit_state.get("last_trade"),
+            "warnings": [],
+            "pipeline_log": [],
+        }
+
     state = {
         "timestamp": time.time(),
         "running": running,
