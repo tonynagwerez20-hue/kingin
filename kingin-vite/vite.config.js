@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 const controlToken = process.env.KINGIN_API_TOKEN || 'replit-local-control'
 
 export default defineConfig({
-  base: '/',
+  base: './',
   plugins: [react()],
   clearScreen: false,
   server: {

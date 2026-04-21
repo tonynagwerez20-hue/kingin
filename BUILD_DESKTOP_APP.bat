@@ -2,6 +2,9 @@
 setlocal
 title KingIn Trading System - Build Desktop App
 
+echo [IMPORTANT] THIS SCRIPT MUST BE RUN AS ADMINISTRATOR 
+echo             (Required to handle symbolic links in Electron-Builder)
+echo.
 echo ============================================================
 echo [1/4] Installing Root Dependencies...
 echo ============================================================
