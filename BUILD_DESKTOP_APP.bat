@@ -6,6 +6,12 @@ echo [IMPORTANT] THIS SCRIPT MUST BE RUN AS ADMINISTRATOR
 echo             (Required to handle symbolic links in Electron-Builder)
 echo.
 echo ============================================================
+echo [0/4] Deep Cleanup (Removing old build artifacts)...
+echo ============================================================
+powershell -Command "Remove-Item -Recurse -Force dist, dist_electron, kingin-vite/dist -ErrorAction SilentlyContinue"
+echo [OK] Old build files purged.
+echo.
+echo ============================================================
 echo [1/4] Installing Root Dependencies...
 echo ============================================================
 call npm install --no-fund
