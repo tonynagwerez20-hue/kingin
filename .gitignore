@@ -69,3 +69,6 @@ _install_readme.py
 # Actual password is entered at login and never written to disk
 # config/trading_params_lite.json is committed WITH password="" only
 node_modules
+dist
+dist_electron
+kingin-vite/dist
