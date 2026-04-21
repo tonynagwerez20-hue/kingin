@@ -8,8 +8,11 @@ echo.
 echo ============================================================
 echo [0/4] Deep Cleanup (Removing old build artifacts)...
 echo ============================================================
+:: Kill any running instances to free up files
+taskkill /F /IM python.exe /T >nul 2>&1
+taskkill /F /IM KingIn.exe /T >nul 2>&1
 powershell -Command "Remove-Item -Recurse -Force dist, dist_electron, kingin-vite/dist -ErrorAction SilentlyContinue"
-echo [OK] Old build files purged.
+echo [OK] Old build files purged and processes cleared.
 echo.
 echo ============================================================
 echo [1/4] Installing Root Dependencies...
