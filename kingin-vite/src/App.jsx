@@ -18,9 +18,8 @@ const App = () => {
     const checkStatus = async () => {
       try {
         // 1. Check if configured
-        const statusRes = await fetch('/api/system/status');
-        const status = await statusRes.json();
-        setIsConfigured(status.configured);
+        const statusRes = await api.get('/system/status');
+        setIsConfigured(statusRes.data.configured);
 
         // 2. Check if logged in
         const token = localStorage.getItem('kingin_jwt');

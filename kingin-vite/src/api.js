@@ -1,7 +1,8 @@
 import axios from 'axios';
 
+const isProduction = !window.location.host.includes('localhost:5173');
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: isProduction ? 'http://localhost:8080/api' : '/api',
   headers: {
     'Content-Type': 'application/json',
   },

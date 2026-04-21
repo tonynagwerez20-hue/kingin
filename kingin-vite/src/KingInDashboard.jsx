@@ -1611,8 +1611,9 @@ export default function KingInDashboard({ onLogout }) {
   const [engineMessage, setEngineMessage] = useState('');
 
   const _engineControlFetch = useCallback(async (path) => {
-    const headers = { 'Content-Type': 'application/json' };
-    return fetch(path, { method: 'POST', headers, body: '{}' });
+    // strip leading /api if present as axios instance already has it
+    const cleanPath = path.startsWith('/api') ? path.substring(4) : path;
+    return api.post(cleanPath, {});
   }, []);
 
   const handleEngineStart = useCallback(async () => {
@@ -1620,7 +1621,7 @@ export default function KingInDashboard({ onLogout }) {
     setEngineMessage('');
     try {
       const res = await _engineControlFetch('/api/engine/start');
-      const data = await res.json();
+      const data = res.data;
       setEngineMessage(data.success ? (data.message || 'Engine started') : (data.error || 'Start failed'));
     } catch (e) {
       setEngineMessage('Start request failed: ' + e.message);
@@ -1635,7 +1636,7 @@ export default function KingInDashboard({ onLogout }) {
     setEngineMessage('');
     try {
       const res = await _engineControlFetch('/api/engine/stop');
-      const data = await res.json();
+      const data = res.data;
       setEngineMessage(data.success ? (data.message || 'Engine stopped') : (data.error || 'Stop failed'));
     } catch (e) {
       setEngineMessage('Stop request failed: ' + e.message);
