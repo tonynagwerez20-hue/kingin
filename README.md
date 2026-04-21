@@ -27,11 +27,12 @@ A professional, secure, and portable desktop application for algorithmic trading
 
 ## 🛠️ Configuration
 
-Once installed, use the **Settings** panel in the dashboard to manage:
+The first time you launch the application, you will be greeted by a **First-Run Setup Wizard**. This guides you through:
 -   **Broker Connection**: MT5 Account, Server, and Password.
 -   **Risk Management**: Lot sizes, risk percent, and confluence thresholds.
--   **Filters**: Toggle SMC layers (Liquidity, FVG, MSS, etc.) and ML filtration.
--   **Symbol Mapping**: Map broker-specific symbols (e.g., `XAUUSD.i`) in `Engine/data_feed/symbol_map.json`.
+-   **System Setup**: Primary trading symbol.
+
+Once completed, these settings can be managed at any time via the **Settings** panel in the main dashboard.
 
 ## 🔒 Security & Privacy
 
