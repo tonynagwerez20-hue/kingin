@@ -40,9 +40,10 @@ _CONTROL_TOKEN = os.getenv("KINGIN_API_TOKEN", "replit-local-control")
 _ALLOWED_ORIGINS = [
     "http://localhost:5000",
     "http://127.0.0.1:5000",
-    "http://localhost:5173",  # Vite default
-    "app://.",               # Electron origin
-    "*",                     # Development fallback
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "app://.",
+    "file://",
 ]
 
 app.add_middleware(

@@ -7,34 +7,49 @@ let pyProc = null;
 
 function startPython() {
   const isDev = !app.isPackaged;
-  console.log(`Starting Python backend (isDev: ${isDev})...`);
+  const fs = require('fs');
   
   let script;
   if (isDev) {
     script = path.join(__dirname, '..', 'kingin_api.py');
   } else {
     // In production, the file is in resources/app/
-    script = path.join(process.resourcesPath, 'app', 'kingin_api.py');
-    // Fallback if not in resources/app/
-    if (!require('fs').existsSync(script)) {
-       script = path.join(app.getAppPath(), 'kingin_api.py');
-    }
+    const possiblePaths = [
+      path.join(process.resourcesPath, 'app', 'kingin_api.py'),
+      path.join(app.getAppPath(), 'kingin_api.py'),
+      path.join(__dirname, '..', 'kingin_api.py'),
+    ];
+    
+    script = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
   }
 
-  console.log(`Script path: ${script}`);
+  console.log(`[Main] Starting Python backend. Script: ${script}`);
   
-  pyProc = spawn('python', [script], {
-    stdio: 'inherit',
-    shell: true
-  });
+  if (!fs.existsSync(script)) {
+    console.error(`[Main] CRITICAL: Backend script not found at ${script}`);
+  }
 
-  pyProc.on('error', (err) => {
-    console.error('CRITICAL: Failed to start Python backend:', err);
-  });
+  // Try 'python', then 'python3' as fallback
+  const spawnOptions = { stdio: 'inherit', shell: true };
+  
+  try {
+    pyProc = spawn('python', [script], spawnOptions);
+    
+    pyProc.on('error', (err) => {
+      console.warn('[Main] Failed to start with "python", trying "python3"...');
+      pyProc = spawn('python3', [script], spawnOptions);
+      
+      pyProc.on('error', (err2) => {
+        console.error('[Main] CRITICAL: Failed to start Python backend with both "python" and "python3":', err2);
+      });
+    });
 
-  pyProc.on('exit', (code) => {
-    console.log(`Python backend exited with code ${code}`);
-  });
+    pyProc.on('exit', (code) => {
+      console.log(`[Main] Python backend exited with code ${code}`);
+    });
+  } catch (err) {
+    console.error('[Main] Unexpected error during backend spawn:', err);
+  }
 }
 
 function createWindow() {
