@@ -1,97 +1,87 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const http = require('http');
+const fs = require('fs');
+
+const LOG_PATH = 'C:\\kingin_debug.log';
+function logToDisk(msg) {
+    const timestamp = new Date().toISOString();
+    const line = `[${timestamp}] ${msg}\n`;
+    try { fs.appendFileSync(LOG_PATH, line); } catch (e) {
+        try { fs.appendFileSync(path.join(app.getPath('userData'), 'kingin_debug.log'), line); } catch (e2) {}
+    }
+}
 
 let mainWindow;
 let pyProc = null;
 
 function startPython() {
-  const isDev = !app.isPackaged;
-  const fs = require('fs');
-  
-  let script;
-  if (isDev) {
-    script = path.join(__dirname, '..', 'kingin_api.py');
-  } else {
-    // In production, the file is in resources/app/
-    const possiblePaths = [
-      path.join(process.resourcesPath, 'app', 'kingin_api.py'),
-      path.join(app.getAppPath(), 'kingin_api.py'),
-      path.join(__dirname, '..', 'kingin_api.py'),
-    ];
-    
-    script = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
-  }
+    logToDisk('--- STARTING BACKEND ---');
+    const isDev = !app.isPackaged;
+    const script = isDev 
+        ? path.join(__dirname, '..', 'kingin_api.py') 
+        : path.join(process.resourcesPath, 'kingin_api.py');
 
-  console.log(`[Main] Starting Python backend. Script: ${script}`);
-  
-  if (!fs.existsSync(script)) {
-    console.error(`[Main] CRITICAL: Backend script not found at ${script}`);
-  }
+    const spawnArgs = [script];
+    const spawnOpts = { 
+        stdio: 'pipe', 
+        cwd: path.dirname(script) 
+    };
 
-  // Try 'python', then 'python3' as fallback
-  const spawnOptions = { stdio: 'inherit', shell: true };
-  
-  try {
-    pyProc = spawn('python', [script], spawnOptions);
-    
-    pyProc.on('error', (err) => {
-      console.warn('[Main] Failed to start with "python", trying "python3"...');
-      pyProc = spawn('python3', [script], spawnOptions);
-      
-      pyProc.on('error', (err2) => {
-        console.error('[Main] CRITICAL: Failed to start Python backend with both "python" and "python3":', err2);
-      });
-    });
-
-    pyProc.on('exit', (code) => {
-      console.log(`[Main] Python backend exited with code ${code}`);
-    });
-  } catch (err) {
-    console.error('[Main] Unexpected error during backend spawn:', err);
-  }
-}
-
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    title: "KingIn Institutional Trading System",
-    backgroundColor: "#080B12",
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'kingin-vite', 'dist', 'index.html'));
-  }
+    const trySpawn = (cmd) => {
+        logToDisk(`Attempting spawn: ${cmd} ${script}`);
+        const proc = spawn(cmd, spawnArgs, spawnOpts);
+        proc.stdout.on('data', (data) => logToDisk(`[PYTHON STDOUT] ${data.toString().trim()}`));
+        proc.stderr.on('data', (data) => logToDisk(`[PYTHON STDERR] ${data.toString().trim()}`));
+        proc.on('error', (err) => {
+            logToDisk(`[SPAWN ERROR] ${cmd} failed: ${err.message}`);
+            if (cmd === 'python') trySpawn('python3');
+            else if (cmd === 'python3') trySpawn('py');
+        });
+        proc.on('exit', (code) => logToDisk(`[PYTHON EXIT] Code: ${code}`));
+        return proc;
+    };
+    pyProc = trySpawn('python');
 }
 
 app.whenReady().then(() => {
-  startPython();
-  createWindow();
+    startPython();
+    ipcMain.handle('api-request', async (event, args) => {
+        return new Promise((resolve) => {
+            const { method, url, data } = args;
+            const options = {
+                hostname: '127.0.0.1', port: 8088,
+                path: url.startsWith('/api') ? url : `/api${url}`,
+                method: method.toUpperCase(),
+                headers: { 'Content-Type': 'application/json', 'X-Control-Token': 'replit-local-control' }
+            };
+            const req = http.request(options, (res) => {
+                let body = '';
+                res.on('data', (c) => body += c);
+                res.on('end', () => {
+                    try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+                    catch (e) { resolve({ status: res.statusCode, data: body }); }
+                });
+            });
+            req.on('error', (e) => resolve({ status: 500, error: e.message }));
+            if (data) req.write(JSON.stringify(data));
+            req.end();
+        });
+    });
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+    mainWindow = new BrowserWindow({
+        width: 1280, height: 800,
+        backgroundColor: "#080B12",
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        }
+    });
+
+    if (!app.isPackaged) { mainWindow.loadURL('http://localhost:5173'); }
+    else { mainWindow.loadFile(path.join(__dirname, '..', 'kingin-vite', 'dist', 'index.html')); }
 });
 
-app.on('window-all-closed', () => {
-  if (pyProc) {
-    console.log('Killing Python backend...');
-    pyProc.kill();
-  }
-  if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('will-quit', () => {
-  if (pyProc) {
-    pyProc.kill();
-  }
-});
+app.on('window-all-closed', () => { if (pyProc) pyProc.kill(); app.quit(); });

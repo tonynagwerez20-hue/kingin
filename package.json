@@ -21,12 +21,9 @@
   "build": {
     "appId": "com.kingin.trading",
     "productName": "KingIn Trading System",
-    "directories": {
-      "output": "dist_electron"
-    },
-    "files": [
-      "electron/**/*",
-      "kingin-vite/dist/**/*",
+    "directories": { "output": "dist_electron" },
+    "files": [ "electron/**/*", "kingin-vite/dist/**/*" ],
+    "extraResources": [
       "kingin_api.py",
       "Engine/**/*",
       "utils/**/*",
@@ -40,9 +37,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "installerIcon": "its_icon.ico",
-      "uninstallerIcon": "its_icon.ico"
+      "createDesktopShortcut": true
     }
   }
 }
