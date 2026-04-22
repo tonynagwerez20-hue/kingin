@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const isProduction = !window.location.host.includes('localhost:5173');
+const isProduction = !window.location.host.includes('localhost:5173') && !window.location.host.includes('127.0.0.1:5173');
 const api = axios.create({
-  baseURL: isProduction ? 'http://localhost:8080/api' : '/api',
+  baseURL: isProduction ? 'http://127.0.0.1:8080/api' : '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -15,6 +15,8 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Add control token for engine management
+    config.headers['X-Control-Token'] = 'replit-local-control';
     return config;
   },
   (error) => {

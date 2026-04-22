@@ -28,6 +28,31 @@ import uvicorn
 
 PROJECT_ROOT = Path(__file__).parent
 
+# Ensure essential directories exist for portability
+(PROJECT_ROOT / "storage" / "logs").mkdir(parents=True, exist_ok=True)
+(PROJECT_ROOT / "data").mkdir(parents=True, exist_ok=True)
+(PROJECT_ROOT / "config").mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(title="KingIn Dashboard API", version="1.0.0")
+
+_CONTROL_TOKEN = os.getenv("KINGIN_API_TOKEN", "replit-local-control")
+
+_ALLOWED_ORIGINS = [
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://localhost:5173",  # Vite default
+    "app://.",               # Electron origin
+    "*",                     # Development fallback
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 def _get_config_path() -> Path:
     return PROJECT_ROOT / "config" / "trading_params_lite.json"
 
@@ -51,6 +76,7 @@ _engine_start_time: Optional[float] = None
 from utils.jwt import create_token, decode_token
 
 def _check_token(request: Request) -> bool:
+    """JWT Token check for standard API routes."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return False
@@ -58,24 +84,10 @@ def _check_token(request: Request) -> bool:
     payload = decode_token(token)
     return bool(payload)
 
-
-app = FastAPI(title="KingIn Dashboard API", version="1.0.0")
-
-_ALLOWED_ORIGINS = [
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    "http://localhost:5173",  # Vite default
-    "app://.",               # Electron origin
-    "*",                     # Development fallback
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def _check_control_token(request: Request) -> bool:
+    """X-Control-Token check for engine management routes."""
+    provided = request.headers.get("X-Control-Token", "")
+    return provided == _CONTROL_TOKEN
 
 @app.post("/api/login")
 async def login(request: Request):
@@ -85,8 +97,6 @@ async def login(request: Request):
         password = body.get("password")
         env_password = os.getenv("KINGIN_USER_PASSWORD")
         
-        # In a real app, use hashed passwords. 
-        # For this requirement, we use the env-based manual password.
         if env_password and password == env_password:
             token = create_token("admin")
             return JSONResponse({"success": True, "token": token})
@@ -94,8 +104,6 @@ async def login(request: Request):
             return JSONResponse({"success": False, "error": "Invalid password"}, status_code=401)
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=400)
-
-
 
 def _get_db_path() -> Path:
     return PROJECT_ROOT / "data" / "hedge.db"
@@ -378,33 +386,17 @@ def _build_engine_state() -> dict:
     return state
 
 
-def _check_token(request: Request) -> bool:
-    """Validate control token for engine lifecycle endpoints."""
-    provided = request.headers.get("X-Control-Token", "")
-    return provided == _CONTROL_TOKEN
-
-
-@app.get("/health")
-async def health():
-    return JSONResponse({"status": "ok", "time": time.time()})
-
-
-@app.post("/engine/init")
-async def engine_init():
-    return JSONResponse({"success": True, "message": "KingIn API server ready"})
-
-
-@app.get("/engine/state")
+@app.get("/api/engine/state")
 async def engine_state(request: Request):
-    if not _check_token(request):
+    if not _check_control_token(request):
         return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
     state = _build_engine_state()
     return JSONResponse(state)
 
 
-@app.post("/engine/start")
+@app.post("/api/engine/start")
 async def engine_start(request: Request):
-    if not _check_token(request):
+    if not _check_control_token(request):
         return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
     global _engine_process, _engine_start_time
 
@@ -447,9 +439,9 @@ async def engine_start(request: Request):
         return JSONResponse({"success": False, "error": str(e)})
 
 
-@app.post("/engine/stop")
+@app.post("/api/engine/stop")
 async def engine_stop(request: Request):
-    if not _check_token(request):
+    if not _check_control_token(request):
         return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=403)
     global _engine_process
 
