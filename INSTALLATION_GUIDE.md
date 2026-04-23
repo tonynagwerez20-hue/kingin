@@ -26,7 +26,18 @@ npm install
 cd ..
 ```
 
-### 3. Build the Desktop Application
+### 3. Configure Environment Variables
+Copy the environment template and set your access password:
+```powershell
+copy .env.example .env
+```
+Then open `.env` in any text editor and set your desired dashboard login password:
+```
+KINGIN_USER_PASSWORD=your_secure_password_here
+```
+> **This step is required.** Without it, the dashboard login will always reject your password.
+
+### 4. Build the Desktop Application
 To create the final installer, run the provided build script:
 ```powershell
 .\BUILD_DESKTOP_APP.bat

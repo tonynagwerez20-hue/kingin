@@ -8,7 +8,7 @@
     "dev:api": "python kingin_api.py",
     "dev:vite": "cd kingin-vite && npm run dev",
     "dev:electron": "wait-on http://127.0.0.1:5173 && electron .",
-    "build": "cd kingin-vite && npm run build",
+    "build": "cd kingin-vite && npm run build && node -e \"const fs=require('fs');const f='dist/index.html';fs.writeFileSync(f, fs.readFileSync(f,'utf8').replace(/ crossorigin/gi, ''))\"",
     "electron:build": "npm run build && electron-builder",
     "test": "pytest Engine/tests"
   },

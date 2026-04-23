@@ -1,8 +1,14 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, net } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
+const url = require('url');
+
+// Register app scheme to bypass file:// CORS for ES Modules
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+]);
 
 const LOG_PATH = 'C:\\kingin_debug.log';
 function logToDisk(msg) {
@@ -45,29 +51,85 @@ function startPython() {
     pyProc = trySpawn('python');
 }
 
-app.whenReady().then(() => {
-    startPython();
-    ipcMain.handle('api-request', async (event, args) => {
-        return new Promise((resolve) => {
-            const { method, url, data } = args;
-            const options = {
-                hostname: '127.0.0.1', port: 8088,
-                path: url.startsWith('/api') ? url : `/api${url}`,
-                method: method.toUpperCase(),
-                headers: { 'Content-Type': 'application/json', 'X-Control-Token': 'replit-local-control' }
-            };
-            const req = http.request(options, (res) => {
-                let body = '';
-                res.on('data', (c) => body += c);
-                res.on('end', () => {
-                    try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
-                    catch (e) { resolve({ status: res.statusCode, data: body }); }
-                });
+/**
+ * Polls port 8088 until the backend responds, then resolves.
+ * Times out after `maxWaitMs` milliseconds.
+ */
+function waitForBackend(maxWaitMs = 15000, intervalMs = 500) {
+    return new Promise((resolve) => {
+        const start = Date.now();
+        const check = () => {
+            const req = http.request(
+                { hostname: '127.0.0.1', port: 8088, path: '/api/system/status', method: 'GET', timeout: 400 },
+                (res) => { res.resume(); resolve(); }
+            );
+            req.on('error', () => {
+                if (Date.now() - start < maxWaitMs) {
+                    setTimeout(check, intervalMs);
+                } else {
+                    logToDisk('[WARN] Backend did not start within timeout — proceeding anyway');
+                    resolve(); // proceed anyway so the UI can show an error
+                }
             });
-            req.on('error', (e) => resolve({ status: 500, error: e.message }));
-            if (data) req.write(JSON.stringify(data));
             req.end();
+        };
+        check();
+    });
+}
+
+/**
+ * Make a single HTTP request to the Python backend.
+ */
+function httpRequest(options, payload) {
+    return new Promise((resolve) => {
+        const req = http.request(options, (res) => {
+            let body = '';
+            res.on('data', (c) => body += c);
+            res.on('end', () => {
+                try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+                catch (e) { resolve({ status: res.statusCode, data: body }); }
+            });
         });
+        req.on('error', (e) => resolve({ status: 500, error: e.message, data: { success: false, error: e.message } }));
+        if (payload) req.write(payload);
+        req.end();
+    });
+}
+
+app.whenReady().then(async () => {
+    // Only auto-start backend in packaged (production) mode.
+    // In dev mode, `npm run dev:api` manages the backend separately.
+    if (app.isPackaged) {
+        startPython();
+        logToDisk('[MAIN] Waiting for backend to become ready...');
+        await waitForBackend();
+        logToDisk('[MAIN] Backend is ready.');
+    }
+
+    ipcMain.handle('api-request', async (event, args) => {
+        const { method, url, data } = args;
+        const payload = data ? (typeof data === 'string' ? data : JSON.stringify(data)) : null;
+        const options = {
+            hostname: '127.0.0.1', port: 8088,
+            // Avoid double-prefixing: /api/login must NOT become /api/api/login
+            path: url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : '/' + url}`,
+            method: method.toUpperCase(),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Control-Token': 'replit-local-control',
+                ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
+            }
+        };
+        return httpRequest(options, payload);
+    });
+
+    // Handle app:// protocol to serve Vite files safely
+    protocol.handle('app', (request) => {
+        const reqUrl = new URL(request.url);
+        let urlPath = reqUrl.pathname;
+        if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
+        const filePath = path.join(__dirname, '..', 'kingin-vite', 'dist', urlPath);
+        return net.fetch(url.pathToFileURL(filePath).href);
     });
 
     mainWindow = new BrowserWindow({
@@ -81,7 +143,8 @@ app.whenReady().then(() => {
     });
 
     if (!app.isPackaged) { mainWindow.loadURL('http://localhost:5173'); }
-    else { mainWindow.loadFile(path.join(__dirname, '..', 'kingin-vite', 'dist', 'index.html')); }
+    else { mainWindow.loadURL('app://kingin/'); }
 });
 
 app.on('window-all-closed', () => { if (pyProc) pyProc.kill(); app.quit(); });
+

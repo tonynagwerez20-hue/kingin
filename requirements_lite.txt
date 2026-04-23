@@ -18,4 +18,7 @@ rich>=13.0.0
 # Optional: finnhub-python only needed if using FinnHub fallback
 # finnhub-python
 
+# JWT authentication (required for dashboard login)
+pyjwt
+
 # Lite React dashboard API endpoint (already covered by fastapi+uvicorn above)

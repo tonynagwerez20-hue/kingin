@@ -16,21 +16,27 @@ const App = () => {
   // Check session and system status on mount
   useEffect(() => {
     const checkStatus = async () => {
-      try {
-        // 1. Check if configured
-        const statusRes = await api.get('/system/status');
-        setIsConfigured(statusRes.data.configured);
-
-        // 2. Check if logged in
-        const token = localStorage.getItem('kingin_jwt');
-        if (token) {
-          setSessionToken(token);
+      // Retry up to 8 times (8s) in case backend is still booting
+      const MAX_RETRIES = 8;
+      let configured = true; // safe default — show login, not setup wizard
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          const statusRes = await api.get('/system/status');
+          configured = statusRes.data.configured ?? true;
+          break; // success — exit retry loop
+        } catch {
+          if (attempt < MAX_RETRIES - 1) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
         }
-      } catch (err) {
-        console.error("Initialization error:", err);
-      } finally {
-        setLoading(false);
       }
+      setIsConfigured(configured);
+
+      // Check if already logged in
+      const token = localStorage.getItem('kingin_jwt');
+      if (token) setSessionToken(token);
+
+      setLoading(false);
     };
     
     checkStatus();

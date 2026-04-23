@@ -48,8 +48,8 @@ _ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -176,6 +176,8 @@ def _read_db_state() -> dict:
         conn.close()
     except Exception as e:
         print(f"[API] DB read error: {e}")
+
+    return state
 
 
 @app.get("/api/settings")
@@ -463,5 +465,5 @@ async def engine_stop(request: Request):
 
 
 if __name__ == "__main__":
-    print(f"[KingIn API] Starting on http://127.0.0.1:8080 (localhost only)")
-    uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
+    print(f"[KingIn API] Starting on http://127.0.0.1:8088 (IPC Bridge Mode)")
+    uvicorn.run(app, host="127.0.0.1", port=8088, log_level="info")
