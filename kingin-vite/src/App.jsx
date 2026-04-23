@@ -16,8 +16,8 @@ const App = () => {
   // Check session and system status on mount
   useEffect(() => {
     const checkStatus = async () => {
-      // Retry up to 8 times (8s) in case backend is still booting
-      const MAX_RETRIES = 8;
+      // Retry up to 120 times (120s) in case backend is still booting
+      const MAX_RETRIES = 120;
       let configured = true; // safe default — show login, not setup wizard
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {

@@ -55,12 +55,12 @@ function startPython() {
  * Polls port 8088 until the backend responds, then resolves.
  * Times out after `maxWaitMs` milliseconds.
  */
-function waitForBackend(maxWaitMs = 15000, intervalMs = 500) {
+function waitForBackend(maxWaitMs = 300000, intervalMs = 2000) {
     return new Promise((resolve) => {
         const start = Date.now();
         const check = () => {
             const req = http.request(
-                { hostname: '127.0.0.1', port: 8088, path: '/api/system/status', method: 'GET', timeout: 400 },
+                { hostname: '127.0.0.1', port: 8088, path: '/api/system/status', method: 'GET', timeout: 1000 },
                 (res) => { res.resume(); resolve(); }
             );
             req.on('error', () => {
